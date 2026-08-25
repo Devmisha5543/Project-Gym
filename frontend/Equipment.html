@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Equipment</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Equipment</h1>
+
+    <ul id="equipment-list"></ul>
+
+    <h2>Add a New Equipment</h2>
+    <form id="add-equipment-form">
+        <label for="branch-select">Branch:</label>
+        <select id="branch-select" required>
+            <option value="">-- Select a branch</option>
+        </select>
+        <br><br>
+
+        <label for="name-input">Name:</label>
+        <input type="text" id="name-input" required>
+        <br><br>
+
+        <label for="quantity-input">Quantity:</label>
+        <input type="number" id="quantity-input" required>
+        <br><br>
+
+        <label for="condition-input">Condition:</label>
+        <input type="text" id="condition-input" required>
+        <br><br>
+
+        <button type="submit">Add Equipment</button>
+    </form>
+    
+
+    <script>
+            function loadEquipments(){
+                const list = document.getElementById("equipment-list");
+                list.innerHTML = "";
+
+                fetch("http://127.0.0.1:5000/equipment")
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(equipment => {
+                            const item = document.createElement("li");
+
+                            const text = document.createElement("span");
+                            text.textContent = equipment.name + " - " + equipment.quantity + " - " + equipment.condition;
+                            item.appendChild(text);
+                            list.appendChild(item);
+                        });
+                    });
+                }
+
+                loadEquipments();
+                fetch("http://127.0.0.1:5000/branches")
+                    .then(response => response.json())
+                    .then(data => {
+                        const select = document.getElementById("branch-select");
+                        data.forEach(branch => {
+                            const option = document.createElement("option");
+                            option.value = branch.branch_id;
+                            option.textContent = branch.name;
+                            select.appendChild(option);
+                        });
+                     });
+                const form = document.getElementById("add-equipment-form");
+
+                form.addEventListener("submit", function (event) {
+                    event.preventDefault();
+
+                    const newEquipment = {
+                        branch_id: document.getElementById("branch-select").value,
+                        name: document.getElementById("name-input").value,
+                        quantity: document.getElementById("quantity-input").value,
+                        condition: document.getElementById("condition-input").value
+                    };
+
+                    fetch("http://127.0.0.1:5000/equipment", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(newEquipment)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        form.reset();   
+                        loadEquipments();
+                    });
+            });
+            
+    </script>
+    
+</body>
+</html>

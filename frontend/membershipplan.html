@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Membership Plans</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Membership Plans</h1>
+    <ul id="plan-list"></ul>
+
+    <h2>Add a New Plan</h2>
+    <form id="add-plan-form">
+        <label for="plan-name-input">Plan Name:</label>
+        <input type="text" id="plan-name-input" required>
+        <br><br>
+
+        <label for="price-input">Price:</label>
+        <input type="number" step="0.01" id="price-input" required>
+        <br><br>
+
+        <label for="perks-input">Perks:</label>
+        <input type="text" id="perks-input" required>
+        <br><br>
+
+        <button type="submit">Add Plan</button>
+    </form>
+
+    <script>
+        function loadPlans() {
+            const list = document.getElementById("plan-list");
+            list.innerHTML = "";
+            fetch("http://127.0.0.1:5000/membershipplans")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(plan => {
+                        const item = document.createElement("li");
+                        item.textContent = plan.plan_name + " - $" + plan.price;
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadPlans();
+
+        const form = document.getElementById("add-plan-form");
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const newPlan = {
+                plan_name: document.getElementById("plan-name-input").value,
+                price: document.getElementById("price-input").value,
+                perks: document.getElementById("perks-input").value
+            };
+
+            fetch("http://127.0.0.1:5000/membershipplans", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newPlan)
+            })
+                .then(response => response.json())
+                .then(result => {
+                    console.log(result);
+                    form.reset();
+                    loadPlans();
+                });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Memberships</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Memberships</h1>
+
+    <ul id="membership-list"></ul>
+
+    <h2>Add a New Membership</h2>
+    <form id="add-membership-form">
+        <label for="member-select">Member:</label>
+        <select id="member-select" required>
+            <option value="">-- Select a member --</option>
+        </select>
+        <br><br>
+
+        <label for="plan-select">Plan:</label>
+        <select id="plan-select" required>
+            <option value="">-- Select a plan --</option>
+        </select>
+        <br><br>
+
+        <label for="start-date-input">Start_Date:</label>
+        <input type="date" id="start-date-input" required>
+        <br><br>
+
+        <label for="end-date-input">End_Date:</label>
+        <input type="date" id="end-date-input" required>
+        <br><br>
+
+        <label for="status-select">Status:</label>
+        <select id="status-select" required>
+            <option value="">-- Select status --</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="cancelled">Cancelled</option>
+        </select>
+        <br><br>
+
+        <button type="submit">Add Membership</button>
+    </form>
+
+    <script>
+        function loadMemberships() {
+            const list = document.getElementById("membership-list");
+            list.innerHTML = "";
+
+            fetch("http://127.0.0.1:5000/memberships")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(membership => {
+                        const item = document.createElement("li");
+                        const text = document.createElement("span");
+                        text.textContent = "Membership #" + membership.membership_id
+                            + " - Member " + membership.member_id
+                            + " - Plan " + membership.plan_id
+                            + " - " + membership.start_date
+                            + " to " + membership.end_date
+                            + " - " + membership.status;
+                        item.appendChild(text);
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadMemberships();
+
+        fetch("http://127.0.0.1:5000/members")
+            .then(response => response.json())
+            .then(members => {
+                const select = document.getElementById("member-select");
+                members.forEach(member => {
+                    const option = document.createElement("option");
+                    option.value = member.member_id;
+                    option.textContent = member.name;
+                    select.appendChild(option);
+                });
+            });
+
+        fetch("http://127.0.0.1:5000/membershipplans")
+            .then(response => response.json())
+            .then(plans => {
+                const select = document.getElementById("plan-select");
+                plans.forEach(plan => {
+                    const option = document.createElement("option");
+                    option.value = plan.plan_id;
+                    option.textContent = plan.plan_name + " - $" + plan.price;
+                    select.appendChild(option);
+                });
+            });
+
+        const form = document.getElementById("add-membership-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const newMembership = {
+                member_id: document.getElementById("member-select").value,
+                plan_id: document.getElementById("plan-select").value,
+                start_date: document.getElementById("start-date-input").value,
+                end_date: document.getElementById("end-date-input").value,
+                status: document.getElementById("status-select").value
+            };
+
+            fetch("http://127.0.0.1:5000/memberships", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newMembership)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    form.reset();
+                    loadMemberships();
+                });
+        });
+    </script>
+</body>
+</html>
