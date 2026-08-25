@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Class Bookings</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Class Bookings</h1>
+
+    <ul id="booking-list"></ul>
+
+    <h2>Add a New Class Booking</h2>
+    <form id="add-booking-form">
+        <label for="member-select">Member:</label>
+        <select id="member-select" required>
+            <option value="">-- Select a member --</option>
+        </select>
+        <br><br>
+
+        <label for="class-select">Class:</label>
+        <select id="class-select" required>
+            <option value="">-- Select a class --</option>
+        </select>
+        <br><br>
+
+        <label for="booking-date-input">Booking_Date:</label>
+        <input type="datetime-local" id="booking-date-input" required>
+        <br><br>
+
+       
+
+        <label for="status-select">Status:</label>
+        <select id="status-select" required>
+            <option value="">-- Select status --</option>
+            <option value="booked">Booked</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="completed">Completed</option>
+        </select>
+        <br><br>
+
+        <button type="submit">Add Class Booking</button>
+    </form>
+
+    <script>
+        function loadClassBookings() {
+            const list = document.getElementById("booking-list");
+            list.innerHTML = "";
+
+            fetch("http://127.0.0.1:5000/classbookings")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(booking => {
+                        const item = document.createElement("li");
+                        const text = document.createElement("span");
+                        text.textContent = "Booking #" + booking.booking_id
+                            + " - Member " + booking.member_id
+                            + " - Class " + booking.class_id
+                            + " - " + booking.booking_date
+                            + " - " + booking.status;
+                        item.appendChild(text);
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadClassBookings();
+
+        fetch("http://127.0.0.1:5000/members")
+            .then(response => response.json())
+            .then(members => {
+                const select = document.getElementById("member-select");
+                members.forEach(member => {
+                    const option = document.createElement("option");
+                    option.value = member.member_id;
+                    option.textContent = member.name;
+                    select.appendChild(option);
+                });
+            });
+
+        fetch("http://127.0.0.1:5000/classes")
+            .then(response => response.json())
+            .then(classes => {
+                const select = document.getElementById("class-select");
+                classes.forEach(gymClass => {
+                    const option = document.createElement("option");
+                    option.value = gymClass.class_id;
+                    option.textContent = gymClass.class_name + " - " + gymClass.schedule_time;
+                    select.appendChild(option);
+                });
+            });
+
+        const form = document.getElementById("add-booking-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const newBooking = {
+                member_id: document.getElementById("member-select").value,
+                class_id: document.getElementById("class-select").value,
+                booking_date: document.getElementById("booking-date-input").value,
+                status: document.getElementById("status-select").value
+            };
+
+            fetch("http://127.0.0.1:5000/classbookings", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newBooking)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    form.reset();
+                    loadClassBookings();
+                });
+        });
+    </script>
+</body>
+</html>

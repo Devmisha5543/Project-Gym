@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+    <meta charset = "UTF-8">
+    <title>Branches</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Branches</h1>
+    <ul id="branch-list"></ul>
+
+    <h2>Add a New Branch</h2>
+    <form id="add-branch-form">
+        <label for="branch-name">Name:</label>
+        <input type="text" id="name-input" required>
+        <br><br>
+
+        <label for="address-input">Address:</label>
+        <input type="text" id="address-input" required>
+        <br><br>
+        
+        <label for="phone-input">Phone:</label>
+        <input type="text" id="phone-input" required>
+        <br><br>
+
+        <label for="city-input">City:</label>
+        <input type="text" id="city-input" required>
+        <br><br>
+
+        <button type="submit">Add Branch</button>
+    </form>
+<script>
+    function loadBranches(){
+        const list = document.getElementById("branch-list");
+        list.innerHTML = "";
+        fetch("http://127.0.0.1:5000/branches")
+            .then(response => response.json())
+            .then(data => {
+                data.forEach(branch => {
+                    const item = document.createElement("li");
+                    item.textContent = branch.name + " - " + branch.city;
+                    list.appendChild(item);
+                });
+            });
+    }
+
+    loadBranches();
+
+    const form = document.getElementById("add-branch-form");
+    form.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            const newBranch = {
+                name: document.getElementById("name-input").value,
+                address: document.getElementById("address-input").value,
+                phone: document.getElementById("phone-input").value,
+                city: document.getElementById("city-input").value
+            };
+
+            fetch("http://127.0.0.1:5000/branches", {
+                method: "POST",
+                headers: { "Content-type": "application/json"},
+                body: JSON.stringify(newBranch)
+            })
+            .then (response => response.json())
+            .then (result => {
+                console.log("Branch added:", result);
+                form.reset();
+                loadBranches();
+            });
+        });
+    </script>
+
+
+
+
+</body>
+</html>

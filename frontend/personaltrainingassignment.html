@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personal Training Assignments</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Personal Training Assignments</h1>
+
+    <ul id="assignment-list"></ul>
+
+    <h2>Add a New Personal Training Assignment</h2>
+    <form id="add-assignment-form">
+        <label for="trainer-select">Trainer:</label>
+        <select id="trainer-select" required>
+            <option value="">-- Select a trainer --</option>
+        </select>
+        <br><br>
+
+        <label for="member-select">Member:</label>
+        <select id="member-select" required>
+            <option value="">-- Select a member --</option>
+        </select>
+        <br><br>
+
+        <label for="speciality-input">Speciality:</label>
+        <input type="text" id="speciality-input" required>
+        <br><br>
+
+        <label for="start-date-input">Start_Date:</label>
+        <input type="date" id="start-date-input" required>
+        <br><br>
+
+        <label for="status-select">Status:</label>
+        <select id="status-select" required>
+            <option value="">-- Select status --</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+        </select>
+        <br><br>
+
+        <button type="submit">Add Assignment</button>
+    </form>
+
+    <script>
+        function loadAssignments() {
+            const list = document.getElementById("assignment-list");
+            list.innerHTML = "";
+
+            fetch("http://127.0.0.1:5000/personaltrainingassignments")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(assignment => {
+                        const item = document.createElement("li");
+                        const text = document.createElement("span");
+                        text.textContent = "Assignment #" + assignment.assignment_id
+                            + " - Trainer " + assignment.trainer_id
+                            + " - Member " + assignment.member_id
+                            + " - " + assignment.speciality
+                            + " - " + assignment.start_date
+                            + " - " + assignment.status;
+                        item.appendChild(text);
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadAssignments();
+
+        fetch("http://127.0.0.1:5000/trainers")
+            .then(response => response.json())
+            .then(trainers => {
+                const select = document.getElementById("trainer-select");
+                trainers.forEach(trainer => {
+                    const option = document.createElement("option");
+                    option.value = trainer.trainer_id;
+                    option.textContent = trainer.name;
+                    select.appendChild(option);
+                });
+            });
+
+        fetch("http://127.0.0.1:5000/members")
+            .then(response => response.json())
+            .then(members => {
+                const select = document.getElementById("member-select");
+                members.forEach(member => {
+                    const option = document.createElement("option");
+                    option.value = member.member_id;
+                    option.textContent = member.name;
+                    select.appendChild(option);
+                });
+            });
+
+        const form = document.getElementById("add-assignment-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const newAssignment = {
+                trainer_id: document.getElementById("trainer-select").value,
+                member_id: document.getElementById("member-select").value,
+                speciality: document.getElementById("speciality-input").value,
+                start_date: document.getElementById("start-date-input").value,
+                status: document.getElementById("status-select").value
+            };
+
+            fetch("http://127.0.0.1:5000/personaltrainingassignments", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newAssignment)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    form.reset();
+                    loadAssignments();
+                });
+        });
+    </script>
+</body>
+</html>

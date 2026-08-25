@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Payment</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <h1>Payment</h1>
+        <ul id="payment-list"></ul>
+
+        <h2>New Payment</h2>
+        <form id="add-payment-form">
+           <label for="membership-select">Membership: </label>
+           <select id="membership-select" required>
+               <option value="">-- Select a membership --</option>
+           </select>
+
+            <label for="amount-input">Amount:</label>
+            <input type="number" step="0.01" id="amount-input" required>
+            <br><br>
+
+            <label for="payment-input">Payment Date:</label>
+            <input type="datetime-local" id="payment-input" required>
+            <br><br>
+
+            <label for="method-input">Method:</label>
+            <input type="text" id="method-input" required>
+            <br><br>
+
+            <button type="submit">Add payment</button>
+        </form>
+        <script>
+            function loadPayment(){
+                const list = document.getElementById("payment-list");
+                list.innerHTML = "";
+
+                fetch("http://127.0.0.1:5000/payments")
+                    .then(response => response.json())
+                    .then(data => {
+                        data.forEach(payment => {
+                            const item = document.createElement("li");
+                            const text = document.createElement("span");
+                            text.textContent = payment.amount + " - " + payment.payment_date;
+                            item.appendChild(text);
+                            list.appendChild(item);
+                        });
+                    });
+
+            }
+
+
+            loadPayment();
+            fetch("http://127.0.0.1:5000/memberships")
+                .then(response => response.json())
+                .then(memberships => {
+                    const select = document.getElementById("membership-select");
+                    memberships.forEach(membership => {
+                        const option = document.createElement("option");
+                        option.value = membership.membership_id;
+                        option.textContent = "Membership #" + membership.membership_id + " (Member " + membership.member_id + ")";
+                        select.appendChild(option);
+        });
+    });
+
+                const form = document.getElementById("add-payment-form");
+                form.addEventListener("submit", function(event){
+                    event.preventDefault();
+
+                    const newPayment = {
+                        membership_id: document.getElementById("membership-select").value,
+                        amount: document.getElementById("amount-input").value,
+                        payment_date: document.getElementById("payment-input").value,
+                        payment_method: document.getElementById("method-input").value 
+                    };
+                    fetch("http://127.0.0.1:5000/payments",{
+                        method: "POST",
+                        headers:{
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(newPayment)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log(data);
+                        form.reset();
+                        loadPayment();
+                    });
+                  
+                });
+        </script>
+    </body>
+</html>
+            
+ 
+        

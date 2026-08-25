@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admins</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Admins</h1>
+
+    <ul id="admin-list"></ul>
+
+    <h2>Add a New Admin</h2>
+    <form id="add-admin-form">
+        <label for="name-input">Name:</label>
+        <input type="text" id="name-input" required>
+        <br><br>
+
+        <label for="email-input">Email:</label>
+        <input type="email" id="email-input" required>
+        <br><br>
+
+        <label for="phone-input">Phone:</label>
+        <input type="text" id="phone-input" required>
+        <br><br>
+
+        <button type="submit">Add Admin</button>
+    </form>
+
+    <script>
+        function loadAdmins() {
+            const list = document.getElementById("admin-list");
+            list.innerHTML = "";
+
+            fetch("http://127.0.0.1:5000/admins")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(admin => {
+                        const item = document.createElement("li");
+                        item.textContent = admin.name + " - " + admin.email + " - " + admin.phone;
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadAdmins();
+
+        const form = document.getElementById("add-admin-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const newAdmin = {
+                name: document.getElementById("name-input").value,
+                email: document.getElementById("email-input").value,
+                phone: document.getElementById("phone-input").value
+            };
+
+            fetch("http://127.0.0.1:5000/admins", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newAdmin)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    form.reset();
+                    loadAdmins();
+                });
+        });
+    </script>
+</body>
+</html>

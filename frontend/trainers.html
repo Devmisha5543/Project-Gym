@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Gym Trainers</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <h1>Trainers</h1>
+        <ul id="trainer-list"></ul>
+
+        <h2>Add a New Trainer</h2>
+        <form id="add-trainer-form">
+            <label for="name-input">Name:</label>
+            <input type="text" id="name-input" required>
+            <br><br>
+
+            <label for="phone-input">Phone:</label>
+            <input type="text" id="phone-input" required>
+            <br><br>
+
+            <label for="email-input">Email:</label>
+            <input type="email" id="email-input" required>
+            <br><br>
+
+            <label for="certificate-input">Certificate:</label>
+            <input type="text" id="certificate-input" required>
+            <br><br>
+
+            <button type="submit">Add Trainer</button>
+        </form>
+
+        <script>
+            function loadTrainers(){
+                const list = document.getElementById("trainer-list");
+                list.innerHTML = "";
+                fetch("http://127.0.0.1:5000/trainers")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(trainer => {
+                        const item = document.createElement("li");
+                        item.textContent = trainer.name + " - " + trainer.phone;
+                        list.appendChild(item);
+                    });
+                });
+            }
+
+            loadTrainers();
+
+        
+
+
+
+        const form = document.getElementById("add-trainer-form");
+
+        form.addEventListener("submit", function(event){
+            event.preventDefault();
+
+            const newTrainer = {
+                name: document.getElementById("name-input").value,
+                phone: document.getElementById("phone-input").value,
+                email: document.getElementById("email-input").value,
+                certification: document.getElementById("certificate-input").value
+            };
+
+            fetch("http://127.0.0.1:5000/trainers", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newTrainer)
+            })
+                .then(response => response.json())
+                .then(result => {
+                    console.log(result);
+                    form.reset();
+                    loadTrainers();
+            });
+        })
+
+        </script>
+    </body>
+</html>

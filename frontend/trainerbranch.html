@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trainer Branch Assignments</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Trainer Branch Assignments</h1>
+
+    <ul id="trainer-branch-list"></ul>
+
+    <h2>Add a New Trainer Branch Assignment</h2>
+    <form id="add-trainer-branch-form">
+        <label for="trainer-select">Trainer:</label>
+        <select id="trainer-select" required>
+            <option value="">-- Select a trainer --</option>
+        </select>
+        <br><br>
+
+        <label for="branch-select">Branch:</label>
+        <select id="branch-select" required>
+            <option value="">-- Select a branch --</option>
+        </select>
+        <br><br>
+
+        <button type="submit">Add Assignment</button>
+    </form>
+
+    <script>
+        function loadTrainerBranches() {
+            const list = document.getElementById("trainer-branch-list");
+            list.innerHTML = "";
+
+            fetch("http://127.0.0.1:5000/trainerbranch")
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(assignment => {
+                        const item = document.createElement("li");
+                        item.textContent = "Trainer " + assignment.trainer_id
+                            + " - Branch " + assignment.branch_id;
+                        list.appendChild(item);
+                    });
+                });
+        }
+
+        loadTrainerBranches();
+
+        fetch("http://127.0.0.1:5000/trainers")
+            .then(response => response.json())
+            .then(trainers => {
+                const select = document.getElementById("trainer-select");
+                trainers.forEach(trainer => {
+                    const option = document.createElement("option");
+                    option.value = trainer.trainer_id;
+                    option.textContent = trainer.name;
+                    select.appendChild(option);
+                });
+            });
+
+        fetch("http://127.0.0.1:5000/branches")
+            .then(response => response.json())
+            .then(branches => {
+                const select = document.getElementById("branch-select");
+                branches.forEach(branch => {
+                    const option = document.createElement("option");
+                    option.value = branch.branch_id;
+                    option.textContent = branch.name;
+                    select.appendChild(option);
+                });
+            });
+
+        const form = document.getElementById("add-trainer-branch-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            const newTrainerBranch = {
+                trainer_id: document.getElementById("trainer-select").value,
+                branch_id: document.getElementById("branch-select").value
+            };
+
+            fetch("http://127.0.0.1:5000/trainerbranch", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newTrainerBranch)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    form.reset();
+                    loadTrainerBranches();
+                });
+        });
+    </script>
+</body>
+</html>
