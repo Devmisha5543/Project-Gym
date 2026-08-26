@@ -127,51 +127,51 @@ function App() {
 
   return (
     <div>
-      <h1>Members</h1>
-      <MemberForm onMemberCreated={loadMembers} />
-      <MemberList members={members} />
-
-      <h1>Branches</h1>
+      <h2>Branch</h2>
       <BranchForm onBranchCreated={loadBranches} />
       <BranchList branches={branches} />
 
-      <h1>Trainers</h1>
+      <h2>Member</h2>
+      <MemberForm onMemberCreated={loadMembers} />
+      <MemberList members={members} />
+
+      <h2>Trainer</h2>
       <TrainerForm onTrainerCreated={loadTrainers} />
       <TrainerList trainers={trainers} />
 
-      <h1>Membership Plans</h1>
+      <h2>MembershipPlan</h2>
       <MembershipPlanForm onMembershipPlanCreated={loadMembershipPlans} />
       <MembershipPlanList membershipPlans={membershipPlans} />
 
-      <h1>Memberships</h1>
+      <h2>Membership</h2>
       <MembershipForm onMembershipCreated={loadMemberships} />
       <MembershipList memberships={memberships} />
 
-      <h1>Personal Training Assignments</h1>
+      <h2>PersonalTrainingAssignment</h2>
       <PersonalTrainingAssignmentForm onPersonalTrainingAssignmentCreated={loadPersonalTrainingAssignments} />
       <PersonalTrainingAssignmentList personalTrainingAssignments={personalTrainingAssignments} />
 
-      <h1>Classes</h1>
+      <h2>Class</h2>
       <ClassForm onClassCreated={loadClasses} />
       <ClassList classes={classes} />
 
-      <h1>Class Bookings</h1>
+      <h2>ClassBooking</h2>
       <ClassBookingForm onClassBookingCreated={loadClassBookings} />
       <ClassBookingList classBookings={classBookings} />
 
-      <h1>Payments</h1>
+      <h2>Payment</h2>
       <PaymentForm onPaymentCreated={loadPayments} />
       <PaymentList payments={payments} />
 
-      <h1>Equipment</h1>
+      <h2>Equipment</h2>
       <EquipmentForm onEquipmentCreated={loadEquipment} />
       <EquipmentList equipment={equipment} />
 
-      <h1>Trainer Branch Assignments</h1>
+      <h2>TrainerBranch</h2>
       <TrainerBranchForm onTrainerBranchCreated={loadTrainerBranches} />
       <TrainerBranchList trainerBranches={trainerBranches} onTrainerBranchDeleted={loadTrainerBranches} />
 
-      <h1>Admins</h1>
+      <h2>Admin</h2>
       <AdminForm onAdminCreated={loadAdmins} />
       <AdminList admins={admins} />
     </div>
