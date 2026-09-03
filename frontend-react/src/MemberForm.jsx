@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { memberSchema } from './schemas'
 import { API_URL } from './config'
 
 function MemberForm({ onMemberCreated }) {
@@ -11,6 +12,7 @@ function MemberForm({ onMemberCreated }) {
   const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0])
   const [wantsTrainer, setWantsTrainer] = useState(false)
   const [photo, setPhoto] = useState(null)
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     fetch(`${API_URL}/branches`)
@@ -20,6 +22,23 @@ function MemberForm({ onMemberCreated }) {
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    const result = memberSchema.safeParse({
+      name,
+      phone,
+      email: ''
+    })
+
+    if (!result.success) {
+      const fieldErrors = {}
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+      setErrors(fieldErrors)
+      return
+    }
+
+    setErrors({})
 
     const formData = new FormData()
     formData.append("branch_id", branchId)
@@ -64,6 +83,7 @@ function MemberForm({ onMemberCreated }) {
 
       <label>Name:</label>
       <input type="text" value={name} onChange={e => setName(e.target.value)} required />
+      {errors.name && <p style={{ color: '#dc2626' }}>{errors.name}</p>}
       <br /><br />
 
       <label>Gender:</label>
@@ -76,6 +96,7 @@ function MemberForm({ onMemberCreated }) {
 
       <label>Phone:</label>
       <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required />
+      {errors.phone && <p style={{ color: '#dc2626' }}>{errors.phone}</p>}
       <br /><br />
 
       <label>Address:</label>
