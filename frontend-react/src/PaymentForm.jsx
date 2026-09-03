@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { paymentSchema } from './schemas'
 import { API_URL } from './config'
 
 function PaymentForm({ onPaymentCreated }) {
@@ -7,6 +8,7 @@ function PaymentForm({ onPaymentCreated }) {
   const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     fetch(`${API_URL}/memberships`)
@@ -16,6 +18,17 @@ function PaymentForm({ onPaymentCreated }) {
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    const result = paymentSchema.safeParse({ membershipId, amount, paymentDate })
+    if (!result.success) {
+      const fieldErrors = {}
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+      setErrors(fieldErrors)
+      return
+    }
+    setErrors({})
 
     const newPayment = {
       membership_id: membershipId,
@@ -50,14 +63,17 @@ function PaymentForm({ onPaymentCreated }) {
           </option>
         ))}
       </select>
+      {errors.membershipId && <p style={{ color: '#dc2626' }}>{errors.membershipId}</p>}
       <br /><br />
 
       <label>Amount:</label>
       <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
+      {errors.amount && <p style={{ color: '#dc2626' }}>{errors.amount}</p>}
       <br /><br />
 
       <label>Payment Date:</label>
       <input type="datetime-local" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} required />
+      {errors.paymentDate && <p style={{ color: '#dc2626' }}>{errors.paymentDate}</p>}
       <br /><br />
 
       <label>Method:</label>

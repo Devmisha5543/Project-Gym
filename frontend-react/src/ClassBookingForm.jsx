@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { classBookingSchema } from './schemas'
 import { API_URL } from './config'
 
 function ClassBookingForm({ onClassBookingCreated }) {
@@ -8,6 +9,7 @@ function ClassBookingForm({ onClassBookingCreated }) {
   const [classId, setClassId] = useState('')
   const [bookingDate, setBookingDate] = useState('')
   const [status, setStatus] = useState('')
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     fetch(`${API_URL}/members`)
@@ -21,6 +23,17 @@ function ClassBookingForm({ onClassBookingCreated }) {
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    const result = classBookingSchema.safeParse({ memberId, classId, bookingDate })
+    if (!result.success) {
+      const fieldErrors = {}
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+      setErrors(fieldErrors)
+      return
+    }
+    setErrors({})
 
     const newBooking = {
       member_id: memberId,
@@ -53,6 +66,7 @@ function ClassBookingForm({ onClassBookingCreated }) {
           <option key={member.member_id} value={member.member_id}>{member.name}</option>
         ))}
       </select>
+      {errors.memberId && <p style={{ color: '#dc2626' }}>{errors.memberId}</p>}
       <br /><br />
 
       <label>Class:</label>
@@ -62,10 +76,12 @@ function ClassBookingForm({ onClassBookingCreated }) {
           <option key={gymClass.class_id} value={gymClass.class_id}>{gymClass.class_name} - {gymClass.schedule_time}</option>
         ))}
       </select>
+      {errors.classId && <p style={{ color: '#dc2626' }}>{errors.classId}</p>}
       <br /><br />
 
       <label>Booking_Date:</label>
       <input type="datetime-local" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required />
+      {errors.bookingDate && <p style={{ color: '#dc2626' }}>{errors.bookingDate}</p>}
       <br /><br />
 
       <label>Status:</label>
