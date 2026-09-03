@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { personalTrainingAssignmentSchema } from './schemas'
 import { API_URL } from './config'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
@@ -9,6 +10,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
   const [speciality, setSpeciality] = useState('')
   const [startDate, setStartDate] = useState('')
   const [status, setStatus] = useState('')
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     fetch(`${API_URL}/trainers`)
@@ -22,6 +24,17 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    const result = personalTrainingAssignmentSchema.safeParse({ trainerId, memberId, startDate })
+    if (!result.success) {
+      const fieldErrors = {}
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+      setErrors(fieldErrors)
+      return
+    }
+    setErrors({})
 
     const newAssignment = {
       trainer_id: trainerId,
@@ -56,6 +69,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
         ))}
       </select>
+      {errors.trainerId && <p style={{ color: '#dc2626' }}>{errors.trainerId}</p>}
       <br /><br />
 
       <label>Member:</label>
@@ -65,6 +79,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           <option key={member.member_id} value={member.member_id}>{member.name}</option>
         ))}
       </select>
+      {errors.memberId && <p style={{ color: '#dc2626' }}>{errors.memberId}</p>}
       <br /><br />
 
       <label>Speciality:</label>
@@ -73,6 +88,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
 
       <label>Start_Date:</label>
       <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+      {errors.startDate && <p style={{ color: '#dc2626' }}>{errors.startDate}</p>}
       <br /><br />
 
       <label>Status:</label>

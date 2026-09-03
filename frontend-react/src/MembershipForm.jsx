@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { membershipSchema } from './schemas'
 import { API_URL } from './config'
 
 function MembershipForm({ onMembershipCreated }) {
@@ -9,6 +10,7 @@ function MembershipForm({ onMembershipCreated }) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [status, setStatus] = useState('')
+  const [errors, setErrors] = useState({})
 
   useEffect(() => {
     fetch(`${API_URL}/members`)
@@ -22,6 +24,17 @@ function MembershipForm({ onMembershipCreated }) {
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    const result = membershipSchema.safeParse({ memberId, planId, startDate, endDate })
+    if (!result.success) {
+      const fieldErrors = {}
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+      setErrors(fieldErrors)
+      return
+    }
+    setErrors({})
 
     const newMembership = {
       member_id: memberId,
@@ -56,6 +69,7 @@ function MembershipForm({ onMembershipCreated }) {
           <option key={member.member_id} value={member.member_id}>{member.name}</option>
         ))}
       </select>
+      {errors.memberId && <p style={{ color: '#dc2626' }}>{errors.memberId}</p>}
       <br /><br />
 
       <label>Plan:</label>
@@ -65,14 +79,17 @@ function MembershipForm({ onMembershipCreated }) {
           <option key={plan.plan_id} value={plan.plan_id}>{plan.plan_name} - ${plan.price}</option>
         ))}
       </select>
+      {errors.planId && <p style={{ color: '#dc2626' }}>{errors.planId}</p>}
       <br /><br />
 
       <label>Start_Date:</label>
       <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+      {errors.startDate && <p style={{ color: '#dc2626' }}>{errors.startDate}</p>}
       <br /><br />
 
       <label>End_Date:</label>
       <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} required />
+      {errors.endDate && <p style={{ color: '#dc2626' }}>{errors.endDate}</p>}
       <br /><br />
 
       <label>Status:</label>
