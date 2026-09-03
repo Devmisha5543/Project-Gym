@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function EquipmentForm({ onEquipmentCreated }) {
   const [branches, setBranches] = useState([])
@@ -8,7 +9,7 @@ function EquipmentForm({ onEquipmentCreated }) {
   const [condition, setCondition] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/branches")
+    fetch(`${API_URL}/branches`)
       .then(response => response.json())
       .then(data => setBranches(data))
   }, [])
@@ -23,7 +24,7 @@ function EquipmentForm({ onEquipmentCreated }) {
       condition
     }
 
-    fetch("http://127.0.0.1:5000/equipment", {
+    fetch(`${API_URL}/equipment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEquipment)

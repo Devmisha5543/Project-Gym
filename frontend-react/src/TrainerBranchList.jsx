@@ -1,6 +1,7 @@
+import { API_URL } from './config'
 function TrainerBranchList({ trainerBranches, onTrainerBranchDeleted }) {
   function handleDelete(assignment) {
-    fetch(`http://127.0.0.1:5000/trainerbranch/${assignment.trainer_id}/${assignment.branch_id}`, {
+    fetch(`${API_URL}/trainerbranch/${assignment.trainer_id}/${assignment.branch_id}`, {
       method: "DELETE"
     })
       .then(response => response.json())

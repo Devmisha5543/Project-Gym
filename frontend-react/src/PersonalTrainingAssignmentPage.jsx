@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import PersonalTrainingAssignmentList from './PersonalTrainingAssignmentList'
 import PersonalTrainingAssignmentForm from './PersonalTrainingAssignmentForm'
 
@@ -6,7 +7,7 @@ function PersonalTrainingAssignmentPage() {
   const [personalTrainingAssignments, setPersonalTrainingAssignments] = useState([])
 
   function loadPersonalTrainingAssignments() {
-    fetch("http://127.0.0.1:5000/personaltrainingassignments")
+    fetch(`${API_URL}/personaltrainingassignments`)
       .then(response => response.json())
       .then(data => setPersonalTrainingAssignments(data))
   }

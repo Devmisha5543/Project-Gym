@@ -1,3 +1,4 @@
+import { API_URL } from './config'
 function MembershipPlanList({ membershipPlans }) {
   return (
     <ul>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import AdminList from './AdminList'
 import AdminForm from './AdminForm'
 
@@ -6,7 +7,7 @@ function AdminPage() {
   const [admins, setAdmins] = useState([])
 
   function loadAdmins() {
-    fetch("http://127.0.0.1:5000/admins")
+    fetch(`${API_URL}/admins`)
       .then(response => response.json())
       .then(data => setAdmins(data))
   }

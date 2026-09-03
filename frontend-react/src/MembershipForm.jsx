@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function MembershipForm({ onMembershipCreated }) {
   const [members, setMembers] = useState([])
@@ -10,11 +11,11 @@ function MembershipForm({ onMembershipCreated }) {
   const [status, setStatus] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/members")
+    fetch(`${API_URL}/members`)
       .then(response => response.json())
       .then(data => setMembers(data))
 
-    fetch("http://127.0.0.1:5000/membershipplans")
+    fetch(`${API_URL}/membershipplans`)
       .then(response => response.json())
       .then(data => setPlans(data))
   }, [])
@@ -30,7 +31,7 @@ function MembershipForm({ onMembershipCreated }) {
       status
     }
 
-    fetch("http://127.0.0.1:5000/memberships", {
+    fetch(`${API_URL}/memberships`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newMembership)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import EquipmentList from './EquipmentList'
 import EquipmentForm from './EquipmentForm'
 
@@ -6,7 +7,7 @@ function EquipmentPage() {
   const [equipment, setEquipment] = useState([])
 
   function loadEquipment() {
-    fetch("http://127.0.0.1:5000/equipment")
+    fetch(`${API_URL}/equipment`)
       .then(response => response.json())
       .then(data => setEquipment(data))
   }

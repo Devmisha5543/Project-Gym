@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import TrainerList from './TrainerList'
 import TrainerForm from './TrainerForm'
 
@@ -6,7 +7,7 @@ function TrainerPage() {
   const [trainers, setTrainers] = useState([])
 
   function loadTrainers() {
-    fetch("http://127.0.0.1:5000/trainers")
+    fetch(`${API_URL}/trainers`)
       .then(response => response.json())
       .then(data => setTrainers(data))
   }

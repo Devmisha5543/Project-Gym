@@ -1,3 +1,4 @@
+import { API_URL } from './config'
 function ClassBookingList({ classBookings }) {
   return (
     <ul>

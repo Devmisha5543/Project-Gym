@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function PaymentForm({ onPaymentCreated }) {
   const [memberships, setMemberships] = useState([])
@@ -8,7 +9,7 @@ function PaymentForm({ onPaymentCreated }) {
   const [paymentMethod, setPaymentMethod] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/memberships")
+    fetch(`${API_URL}/memberships`)
       .then(response => response.json())
       .then(data => setMemberships(data))
   }, [])
@@ -23,7 +24,7 @@ function PaymentForm({ onPaymentCreated }) {
       payment_method: paymentMethod
     }
 
-    fetch("http://127.0.0.1:5000/payments", {
+    fetch(`${API_URL}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPayment)
