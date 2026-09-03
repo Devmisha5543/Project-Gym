@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function ClassForm({ onClassCreated }) {
   const [branches, setBranches] = useState([])
@@ -11,11 +12,11 @@ function ClassForm({ onClassCreated }) {
   const [capacity, setCapacity] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/branches")
+    fetch(`${API_URL}/branches`)
       .then(response => response.json())
       .then(data => setBranches(data))
 
-    fetch("http://127.0.0.1:5000/trainers")
+    fetch(`${API_URL}/trainers`)
       .then(response => response.json())
       .then(data => setTrainers(data))
   }, [])
@@ -32,7 +33,7 @@ function ClassForm({ onClassCreated }) {
       capacity
     }
 
-    fetch("http://127.0.0.1:5000/classes", {
+    fetch(`${API_URL}/classes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newClass)

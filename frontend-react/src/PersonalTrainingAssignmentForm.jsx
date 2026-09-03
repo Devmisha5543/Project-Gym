@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -10,11 +11,11 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
   const [status, setStatus] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/trainers")
+    fetch(`${API_URL}/trainers`)
       .then(response => response.json())
       .then(data => setTrainers(data))
 
-    fetch("http://127.0.0.1:5000/members")
+    fetch(`${API_URL}/members`)
       .then(response => response.json())
       .then(data => setMembers(data))
   }, [])
@@ -30,7 +31,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
       status
     }
 
-    fetch("http://127.0.0.1:5000/personaltrainingassignments", {
+    fetch(`${API_URL}/personaltrainingassignments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAssignment)

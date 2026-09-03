@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_URL } from './config'
 
 function AdminForm({ onAdminCreated }) {
   const [name, setName] = useState('')
@@ -10,7 +11,7 @@ function AdminForm({ onAdminCreated }) {
 
     const newAdmin = { name, email, phone }
 
-    fetch("http://127.0.0.1:5000/admins", {
+    fetch(`${API_URL}/admins`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAdmin)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function MemberForm({ onMemberCreated }) {
   const [branches, setBranches] = useState([])
@@ -12,7 +13,7 @@ function MemberForm({ onMemberCreated }) {
   const [photo, setPhoto] = useState(null)
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/branches")
+    fetch(`${API_URL}/branches`)
       .then(response => response.json())
       .then(data => setBranches(data))
   }, [])
@@ -32,7 +33,7 @@ function MemberForm({ onMemberCreated }) {
       formData.append("photo", photo)
     }
 
-    fetch("http://127.0.0.1:5000/members", {
+    fetch(`${API_URL}/members`, {
       method: "POST",
       body: formData
     })

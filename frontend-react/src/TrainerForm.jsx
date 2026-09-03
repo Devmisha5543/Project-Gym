@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_URL } from './config'
 
 function TrainerForm({ onTrainerCreated }) {
   const [name, setName] = useState('')
@@ -11,7 +12,7 @@ function TrainerForm({ onTrainerCreated }) {
 
     const newTrainer = { name, phone, email, certification }
 
-    fetch("http://127.0.0.1:5000/trainers", {
+    fetch(`${API_URL}/trainers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainer)

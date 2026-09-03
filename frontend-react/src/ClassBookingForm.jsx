@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function ClassBookingForm({ onClassBookingCreated }) {
   const [members, setMembers] = useState([])
@@ -9,11 +10,11 @@ function ClassBookingForm({ onClassBookingCreated }) {
   const [status, setStatus] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/members")
+    fetch(`${API_URL}/members`)
       .then(response => response.json())
       .then(data => setMembers(data))
 
-    fetch("http://127.0.0.1:5000/classes")
+    fetch(`${API_URL}/classes`)
       .then(response => response.json())
       .then(data => setClasses(data))
   }, [])
@@ -28,7 +29,7 @@ function ClassBookingForm({ onClassBookingCreated }) {
       status
     }
 
-    fetch("http://127.0.0.1:5000/classbookings", {
+    fetch(`${API_URL}/classbookings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newBooking)

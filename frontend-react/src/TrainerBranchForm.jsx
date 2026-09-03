@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -7,11 +8,11 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [branchId, setBranchId] = useState('')
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/trainers")
+    fetch(`${API_URL}/trainers`)
       .then(response => response.json())
       .then(data => setTrainers(data))
 
-    fetch("http://127.0.0.1:5000/branches")
+    fetch(`${API_URL}/branches`)
       .then(response => response.json())
       .then(data => setBranches(data))
   }, [])
@@ -24,7 +25,7 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
       branch_id: branchId
     }
 
-    fetch("http://127.0.0.1:5000/trainerbranch", {
+    fetch(`${API_URL}/trainerbranch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainerBranch)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 
 function DashboardPage() {
   const [expiring, setExpiring] = useState([])
@@ -7,21 +8,21 @@ function DashboardPage() {
   const [totalRevenue, setTotalRevenue] = useState(0)
 
   function loadExpiring() {
-    fetch("http://127.0.0.1:5000/memberships/expiring")
+    fetch(`${API_URL}/memberships/expiring`)
       .then(response => response.json())
       .then(data => setExpiring(data))
   }
 
   function loadStats() {
-    fetch("http://127.0.0.1:5000/members")
+    fetch(`${API_URL}/members`)
       .then(response => response.json())
       .then(data => setMemberCount(data.length))
 
-    fetch("http://127.0.0.1:5000/classes")
+    fetch(`${API_URL}/classes`)
       .then(response => response.json())
       .then(data => setClassCount(data.length))
 
-    fetch("http://127.0.0.1:5000/payments")
+    fetch(`${API_URL}/payments`)
       .then(response => response.json())
       .then(data => {
         const total = data.reduce((sum, payment) => sum + Number(payment.amount), 0)

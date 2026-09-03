@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { API_URL } from './config'
 
 function BranchForm({ onBranchCreated }) {
   const [name, setName] = useState('')
@@ -11,7 +12,7 @@ function BranchForm({ onBranchCreated }) {
 
     const newBranch = { name, address, phone, city }
 
-    fetch("http://127.0.0.1:5000/branches", {
+    fetch(`${API_URL}/branches`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newBranch)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import ClassBookingList from './ClassBookingList'
 import ClassBookingForm from './ClassBookingForm'
 
@@ -6,7 +7,7 @@ function ClassBookingPage() {
   const [classBookings, setClassBookings] = useState([])
 
   function loadClassBookings() {
-    fetch("http://127.0.0.1:5000/classbookings")
+    fetch(`${API_URL}/classbookings`)
       .then(response => response.json())
       .then(data => setClassBookings(data))
   }

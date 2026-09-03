@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import MembershipList from './MembershipList'
 import MembershipForm from './MembershipForm'
 
@@ -6,7 +7,7 @@ function MembershipPage() {
   const [memberships, setMemberships] = useState([])
 
   function loadMemberships() {
-    fetch("http://127.0.0.1:5000/memberships")
+    fetch(`${API_URL}/memberships`)
       .then(response => response.json())
       .then(data => setMemberships(data))
   }

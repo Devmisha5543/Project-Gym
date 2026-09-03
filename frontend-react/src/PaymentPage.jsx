@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_URL } from './config'
 import PaymentList from './PaymentList'
 import PaymentForm from './PaymentForm'
 
@@ -6,7 +7,7 @@ function PaymentPage() {
   const [payments, setPayments] = useState([])
 
   function loadPayments() {
-    fetch("http://127.0.0.1:5000/payments")
+    fetch(`${API_URL}/payments`)
       .then(response => response.json())
       .then(data => setPayments(data))
   }
