@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { classSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function ClassForm({ onClassCreated }) {
   const [branches, setBranches] = useState([])
@@ -46,7 +47,7 @@ function ClassForm({ onClassCreated }) {
       capacity
     }
 
-    fetch(`${API_URL}/classes`, {
+    authFetch(`${API_URL}/classes`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newClass)

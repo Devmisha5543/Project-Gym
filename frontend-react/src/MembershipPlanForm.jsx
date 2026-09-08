@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { membershipPlanSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function MembershipPlanForm({ onMembershipPlanCreated }) {
   const [planName, setPlanName] = useState('')
@@ -28,7 +29,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
       perks
     }
 
-    fetch(`${API_URL}/membershipplans`, {
+    authFetch(`${API_URL}/membershipplans`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPlan)

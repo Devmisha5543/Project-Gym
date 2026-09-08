@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { equipmentSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function EquipmentForm({ onEquipmentCreated }) {
   const [branches, setBranches] = useState([])
@@ -37,7 +38,7 @@ function EquipmentForm({ onEquipmentCreated }) {
       condition
     }
 
-    fetch(`${API_URL}/equipment`, {
+    authFetch(`${API_URL}/equipment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newEquipment)

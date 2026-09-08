@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { trainerSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function TrainerForm({ onTrainerCreated }) {
   const [name, setName] = useState('')
@@ -25,7 +26,7 @@ function TrainerForm({ onTrainerCreated }) {
 
     const newTrainer = { name, phone, email, certification }
 
-    fetch(`${API_URL}/trainers`, {
+    authFetch(`${API_URL}/trainers`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainer)

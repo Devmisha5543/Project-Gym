@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { classBookingSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function ClassBookingForm({ onClassBookingCreated }) {
   const [members, setMembers] = useState([])
@@ -42,7 +43,7 @@ function ClassBookingForm({ onClassBookingCreated }) {
       status
     }
 
-    fetch(`${API_URL}/classbookings`, {
+    authFetch(`${API_URL}/classbookings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newBooking)

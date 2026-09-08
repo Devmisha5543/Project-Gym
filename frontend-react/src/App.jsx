@@ -14,6 +14,7 @@ import EquipmentPage from './EquipmentPage'
 import TrainerBranchPage from './TrainerBranchPage'
 import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
+import LoginPage from './LoginPage'
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
           <Route path="/equipment" element={<EquipmentPage />} />
           <Route path="/trainerbranch" element={<TrainerBranchPage />} />
           <Route path="/admins" element={<AdminPage />} />
+          <Route path="/login" element={<LoginPage />} />
         </Routes>
       </main>
     </div>

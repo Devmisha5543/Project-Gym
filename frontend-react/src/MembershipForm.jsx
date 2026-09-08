@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { membershipSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function MembershipForm({ onMembershipCreated }) {
   const [members, setMembers] = useState([])
@@ -44,7 +45,7 @@ function MembershipForm({ onMembershipCreated }) {
       status
     }
 
-    fetch(`${API_URL}/memberships`, {
+    authFetch(`${API_URL}/memberships`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newMembership)
