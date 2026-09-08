@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { memberSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function MemberForm({ onMemberCreated }) {
   const [branches, setBranches] = useState([])
@@ -52,7 +53,7 @@ function MemberForm({ onMemberCreated }) {
       formData.append("photo", photo)
     }
 
-    fetch(`${API_URL}/members`, {
+    authFetch(`${API_URL}/members`, {
       method: "POST",
       body: formData
     })

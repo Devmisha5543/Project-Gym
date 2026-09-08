@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { personalTrainingAssignmentSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -44,7 +45,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
       status
     }
 
-    fetch(`${API_URL}/personaltrainingassignments`, {
+    authFetch(`${API_URL}/personaltrainingassignments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAssignment)

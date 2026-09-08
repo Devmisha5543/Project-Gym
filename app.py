@@ -78,8 +78,8 @@ def get_branches():
 
     return jsonify(branches)
 
-@token_required
 @app.route("/branches", methods=["POST"])
+@token_required
 def create_branch():
     data = request.json
 
@@ -109,8 +109,8 @@ def create_branch():
 
     return jsonify({"message": "Branch created", "branch_id": new_id}), 201
 
-@token_required
 @app.route("/branches/<int:branch_id>", methods=["DELETE"])
+@token_required
 def delete_branch(branch_id):
 
     conn=psycopg2.connect(
@@ -135,8 +135,8 @@ def delete_branch(branch_id):
 
     return jsonify({"message": f"Branch {branch_id} deleted"}), 200
 
-@token_required
 @app.route("/branches/<int:branch_id>", methods=["PUT"])
+@token_required
 def update_branch(branch_id):
     data = request.json
 
@@ -197,8 +197,8 @@ def get_members():
 
     return jsonify(members)
 
-@token_required
 @app.route("/members", methods=["POST"])
+@token_required
 def create_member():
     data=request.form
 
@@ -236,8 +236,8 @@ def create_member():
 
     return jsonify({"message": "Member created", "member_id": new_id}), 201
 
-@token_required
 @app.route("/members/<int:member_id>", methods=["DELETE"])
+@token_required
 def delete_member(member_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -261,8 +261,8 @@ def delete_member(member_id):
 
     return jsonify({"message": f"Member {member_id} deleted"}), 200
 
-@token_required
 @app.route("/members/<int:member_id>", methods=["PUT"])
+@token_required
 def update_member(member_id):
     data = request.json
 
@@ -320,8 +320,9 @@ def get_trainers():
 
     return jsonify(trainers)
 
-@token_required
+
 @app.route("/trainers", methods=["POST"])
+@token_required
 def create_trainer():
     data = request.json
 
@@ -353,8 +354,8 @@ def create_trainer():
     
     return jsonify({"message": "Trainer created", "trainer_id": new_id}), 201
 
-@token_required
 @app.route("/trainers/<int:trainer_id>", methods=["DELETE"])
+@token_required
 def delete_trainer(trainer_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -378,8 +379,8 @@ def delete_trainer(trainer_id):
 
     return jsonify({"message": f"Trainer {trainer_id} deleted"}), 200
 
-@token_required
 @app.route("/trainers/<int:trainer_id>", methods=["PUT"])
+@token_required
 def update_trainer(trainer_id):
     data = request.json
 
@@ -470,8 +471,8 @@ def get_expiring_memberships():
 
     return jsonify(expiring)
 
-@token_required
 @app.route("/memberships", methods=["POST"])
+@token_required
 def create_membership():
     data = request.json
 
@@ -502,8 +503,8 @@ def create_membership():
 
     return jsonify({"message": "Membership created", "membership_id": new_id}), 201
 
-@token_required
 @app.route("/memberships/<int:membership_id>", methods=["DELETE"])
+@token_required
 def delete_membership(membership_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -527,8 +528,8 @@ def delete_membership(membership_id):
 
     return jsonify({"message": f"Membership {membership_id} deleted"}), 200
 
-@token_required
 @app.route("/memberships/<int:membership_id>", methods=["PUT"])
+@token_required
 def update_membership(membership_id):
     data=request.json
 
@@ -588,8 +589,8 @@ def get_personal_trainer_assignments():
 
     return jsonify(assignments)
 
-@token_required
 @app.route("/personaltrainingassignments", methods=["POST"])
+@token_required
 def create_personal_trainer_assignment():
     data = request.json
 
@@ -619,8 +620,8 @@ def create_personal_trainer_assignment():
 
     return jsonify({"message": "Personal trainer assignment created", "assignment_id": new_id}), 201
 
-@token_required
 @app.route("/personaltrainingassignments/<int:assignment_id>", methods=["DELETE"])
+@token_required
 def delete_personal_trainer_assignment(assignment_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -644,8 +645,8 @@ def delete_personal_trainer_assignment(assignment_id):
 
     return jsonify({"message": f"Personal trainer assignment {assignment_id} deleted"}), 200
 
-@token_required
 @app.route("/personaltrainingassignments/<int:assignment_id>", methods=["PUT"])
+@token_required
 def update_personal_trainer_assignment(assignment_id):
     data = request.json
 
@@ -703,8 +704,8 @@ def get_class_bookings():
 
     return jsonify(bookings)
 
-@token_required
 @app.route("/classbookings", methods=["POST"])
+@token_required
 def create_class_booking():
     data = request.json
 
@@ -733,8 +734,8 @@ def create_class_booking():
 
     return jsonify({"message": "Class booking created", "booking_id": new_id}), 201
 
-@token_required
 @app.route("/classbookings/<int:booking_id>", methods=["DELETE"])
+@token_required
 def delete_class_booking(booking_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -758,8 +759,8 @@ def delete_class_booking(booking_id):
 
     return jsonify({"message": f"Class booking {booking_id} deleted"}), 200
 
-@token_required
 @app.route("/classbookings/<int:booking_id>", methods=["PUT"])
+@token_required
 def update_class_booking(booking_id):
     data = request.json
 
@@ -818,8 +819,8 @@ def get_classes():
 
     return jsonify(classes)
 
-@token_required
 @app.route("/classes", methods=["POST"])
+@token_required
 def create_class():
     data = request.json
 
@@ -848,8 +849,8 @@ def create_class():
 
     return jsonify({"message": "Class created", "class_id": new_id}), 201
 
-@token_required
 @app.route("/classes/<int:class_id>", methods=["DELETE"])
+@token_required
 def delete_class(class_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -873,8 +874,8 @@ def delete_class(class_id):
 
     return jsonify({"message": f"Class {class_id} deleted"}), 200
 
-@token_required
 @app.route("/classes/<int:class_id>", methods=["PUT"])
+@token_required
 def update_class(class_id):
     data = request.json
 
@@ -930,8 +931,8 @@ def get_payments():
 
     return jsonify(payments)
 
-@token_required
 @app.route("/payments", methods=["POST"])
+@token_required
 def create_payment():
     data = request.json
 
@@ -960,8 +961,8 @@ def create_payment():
 
     return jsonify({"message": "Payment created", "payment_id": new_id}), 201
 
-@token_required
 @app.route("/payments/<int:payment_id>", methods=["DELETE"])
+@token_required
 def delete_payment(payment_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -985,8 +986,8 @@ def delete_payment(payment_id):
 
     return jsonify({"message": f"Payment {payment_id} deleted"}), 200
 
-@token_required
 @app.route("/payments/<int:payment_id>", methods=["PUT"])
+@token_required
 def update_payment(payment_id):
     data = request.json
 
@@ -1043,8 +1044,8 @@ def get_equipment():
 
     return jsonify(equipment_list)
 
-@token_required
 @app.route("/equipment", methods=["POST"])
+@token_required
 def create_equipment():
     data = request.json
 
@@ -1073,8 +1074,8 @@ def create_equipment():
 
     return jsonify({"message": "Equipment created", "equipment_id": new_id}), 201
 
-@token_required
 @app.route("/equipment/<int:equipment_id>", methods=["DELETE"])
+@token_required
 def delete_equipment(equipment_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -1098,8 +1099,8 @@ def delete_equipment(equipment_id):
 
     return jsonify({"message": f"Equipment {equipment_id} deleted"}), 200
 
-@token_required
 @app.route("/equipment/<int:equipment_id>", methods=["PUT"])
+@token_required
 def update_equipment(equipment_id):
     data = request.json
 
@@ -1153,8 +1154,8 @@ def get_trainer_branch():
 
     return jsonify(trainer_branch)
 
-@token_required
 @app.route("/trainerbranch", methods=["POST"])
+@token_required
 def create_trainer_branch():
     data = request.json
 
@@ -1183,8 +1184,8 @@ def create_trainer_branch():
 
     return jsonify({"message": "Trainer-Branch relationship created"}), 201
 
-@token_required
 @app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["DELETE"])
+@token_required
 def delete_trainer_branch(trainer_id, branch_id):
     conn=psycopg2.connect(
         host="localhost",
@@ -1234,8 +1235,8 @@ def get_membership_plans():
     return jsonify(plans)
 
 
-@token_required
 @app.route("/membershipplans", methods=["POST"])
+@token_required
 def create_membership_plan():
     data = request.json
 
@@ -1266,8 +1267,8 @@ def create_membership_plan():
     return jsonify({"message": "Membership plan created", "plan_id": new_id}), 201
 
 
-@token_required
 @app.route("/membershipplans/<int:plan_id>", methods=["DELETE"])
+@token_required
 def delete_membership_plan(plan_id):
     conn = psycopg2.connect(
         host="localhost",
@@ -1291,8 +1292,8 @@ def delete_membership_plan(plan_id):
     return jsonify({"message": f"MembershipPlan {plan_id} deleted"}), 200
 
 
-@token_required
 @app.route("/membershipplans/<int:plan_id>", methods=["PUT"])
+@token_required
 def update_membership_plan(plan_id):
     data = request.json
 
@@ -1323,8 +1324,8 @@ def update_membership_plan(plan_id):
 
     return jsonify({"message": f"MembershipPlan {plan_id} updated"}), 200
 
-@token_required
 @app.route("/admins", methods=["POST"])
+@token_required
 def create_admin():
     data = request.json
 

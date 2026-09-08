@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { adminSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function AdminForm({ onAdminCreated }) {
   const [name, setName] = useState('')
@@ -24,7 +25,7 @@ function AdminForm({ onAdminCreated }) {
 
     const newAdmin = { name, email, phone }
 
-    fetch(`${API_URL}/admins`, {
+    authFetch(`${API_URL}/admins`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAdmin)

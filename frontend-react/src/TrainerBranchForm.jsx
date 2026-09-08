@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { trainerBranchSchema } from './schemas'
 import { API_URL } from './config'
+import { authFetch } from './authFetch'
 
 function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -38,7 +39,7 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
       branch_id: branchId
     }
 
-    fetch(`${API_URL}/trainerbranch`, {
+    authFetch(`${API_URL}/trainerbranch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainerBranch)
