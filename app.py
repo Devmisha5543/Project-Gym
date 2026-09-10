@@ -13,11 +13,23 @@ from flask import request
 
 load_dotenv()
 
+def get_db_connection():
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return psycopg2.connect(database_url)
+    else:
+        return psycopg2.connect(
+            host="localhost",
+            database="gym_db",
+            user="postgres",
+            password=os.getenv("DB_PASSWORD")
+        )
+
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-CORS(app)
+CORS(app, origins=["http://localhost:5173"])
 
 
 
@@ -54,12 +66,7 @@ def home():
 
 @app.route("/branches")
 def get_branches():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT branch_id, name, address, phone, city FROM branch;")
     rows = cursor.fetchall()
@@ -91,12 +98,7 @@ def create_branch():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Branch (name, address, phone, city) VALUES(%s, %s, %s, %s)RETURNING branch_id;",
@@ -113,12 +115,7 @@ def create_branch():
 @token_required
 def delete_branch(branch_id):
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Branch WHERE branch_id = %s;", (branch_id,))
@@ -143,12 +140,7 @@ def update_branch(branch_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Branch SET name = %s, address = %s, phone = %s, city=%s WHERE branch_id = %s;",
@@ -168,12 +160,7 @@ def update_branch(branch_id):
 
 @app.route("/members")
 def get_members():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT member_id, branch_id,name, gender, phone, address, join_date, wants_trainer, photo_filename FROM member;")
     rows = cursor.fetchall()
@@ -218,12 +205,7 @@ def create_member():
             photo_filename = secure_filename(file.filename)
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
 
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor= conn.cursor()
     cursor.execute(
         "INSERT INTO Member (branch_id, name, gender, phone, address, join_date, wants_trainer, photo_filename) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING member_id;",
@@ -239,12 +221,7 @@ def create_member():
 @app.route("/members/<int:member_id>", methods=["DELETE"])
 @token_required
 def delete_member(member_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Member WHERE member_id = %s;", (member_id,))
@@ -269,12 +246,7 @@ def update_member(member_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
     cursor=conn.cursor()
     cursor.execute("UPDATE Member SET name = %s, phone = %s WHERE member_id = %s;",
                    (data["name"], data["phone"], member_id))
@@ -294,12 +266,7 @@ def update_member(member_id):
 
 @app.route("/trainers")
 def get_trainers():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT trainer_id, name, phone, email, certification FROM trainer;")
@@ -334,13 +301,7 @@ def create_trainer():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn =psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-
-    )
+    conn =get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Trainer (name, phone, email, certification) VALUES(%s, %s, %s, %s) RETURNING trainer_id;",
@@ -357,12 +318,7 @@ def create_trainer():
 @app.route("/trainers/<int:trainer_id>", methods=["DELETE"])
 @token_required
 def delete_trainer(trainer_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Trainer WHERE trainer_id = %s;", (trainer_id,))
@@ -387,12 +343,7 @@ def update_trainer(trainer_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Trainer SET name = %s, phone = %s, email = %s, certification = %s WHERE trainer_id = %s",
@@ -412,12 +363,7 @@ def update_trainer(trainer_id):
 
 @app.route("/memberships")
 def get_memberships():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT membership_id, member_id, plan_id, start_date, end_date, status FROM membership;")
@@ -440,12 +386,7 @@ def get_memberships():
 
 @app.route("/memberships/expiring")
 def get_expiring_memberships():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         SELECT membership.membership_id, member.name, member.phone, membership.end_date, membership.status
@@ -484,12 +425,7 @@ def create_membership():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Membership (member_id, plan_id, start_date, end_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING membership_id;",
@@ -506,12 +442,7 @@ def create_membership():
 @app.route("/memberships/<int:membership_id>", methods=["DELETE"])
 @token_required
 def delete_membership(membership_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Membership WHERE membership_id = %s;", (membership_id,))
@@ -536,13 +467,7 @@ def update_membership(membership_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s WHERE membership_id = %s;",
@@ -563,12 +488,7 @@ def update_membership(membership_id):
 @app.route("/personaltrainingassignments")
 
 def get_personal_trainer_assignments():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT assignment_id, trainer_id, member_id, speciality, start_date, status FROM personaltrainingassignment;")
@@ -602,12 +522,7 @@ def create_personal_trainer_assignment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO PersonalTrainingAssignment (trainer_id, member_id, speciality, start_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING assignment_id;",
@@ -623,12 +538,7 @@ def create_personal_trainer_assignment():
 @app.route("/personaltrainingassignments/<int:assignment_id>", methods=["DELETE"])
 @token_required
 def delete_personal_trainer_assignment(assignment_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM PersonalTrainingAssignment WHERE assignment_id = %s;", (assignment_id,))
@@ -653,12 +563,7 @@ def update_personal_trainer_assignment(assignment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE PersonalTrainingAssignment SET trainer_id = %s, member_id = %s, speciality = %s, start_date = %s, status = %s WHERE assignment_id = %s;",
@@ -678,12 +583,7 @@ def update_personal_trainer_assignment(assignment_id):
 
 @app.route("/classbookings")
 def get_class_bookings():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT booking_id, member_id, class_id, booking_date, status FROM classbooking;")
@@ -717,12 +617,7 @@ def create_class_booking():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO ClassBooking (member_id, class_id, booking_date, cancel_date, status) VALUES(%s,%s, %s, %s, %s) RETURNING booking_id;",
@@ -737,12 +632,7 @@ def create_class_booking():
 @app.route("/classbookings/<int:booking_id>", methods=["DELETE"])
 @token_required
 def delete_class_booking(booking_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM ClassBooking WHERE booking_id = %s;", (booking_id,))
@@ -767,12 +657,7 @@ def update_class_booking(booking_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE ClassBooking SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s WHERE booking_id = %s;",
@@ -792,12 +677,7 @@ def update_class_booking(booking_id):
 
 @app.route("/classes")
 def get_classes():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT class_id, trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity FROM class;")
@@ -832,12 +712,7 @@ def create_class():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Class (trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity) VALUES(%s, %s, %s, %s, %s, %s) RETURNING class_id;",
@@ -852,12 +727,7 @@ def create_class():
 @app.route("/classes/<int:class_id>", methods=["DELETE"])
 @token_required
 def delete_class(class_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Class WHERE class_id = %s;", (class_id,))
@@ -882,12 +752,7 @@ def update_class(class_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Class SET trainer_id = %s, branch_id = %s, class_name = %s, schedule_time = %s, duration_minutes = %s, capacity = %s WHERE class_id = %s;",
@@ -907,12 +772,7 @@ def update_class(class_id):
 
 @app.route("/payments")
 def get_payments():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
     cursor=conn.cursor()
     cursor.execute("SELECT payment_id, membership_id, amount, payment_date, payment_method FROM payment;")
     rows = cursor.fetchall()
@@ -944,12 +804,7 @@ def create_payment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Payment (membership_id, amount, payment_date, payment_method) VALUES(%s, %s, %s, %s) RETURNING payment_id;",
@@ -964,12 +819,7 @@ def create_payment():
 @app.route("/payments/<int:payment_id>", methods=["DELETE"])
 @token_required
 def delete_payment(payment_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Payment WHERE payment_id = %s;", (payment_id,))
@@ -994,12 +844,7 @@ def update_payment(payment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Payment SET membership_id = %s, amount = %s, payment_date = %s, payment_method = %s WHERE payment_id = %s;",
@@ -1019,12 +864,7 @@ def update_payment(payment_id):
 
 @app.route("/equipment")
 def get_equipment():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT equipment_id, branch_id, name, quantity, condition FROM equipment;")
@@ -1057,12 +897,7 @@ def create_equipment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO Equipment (branch_id, name, quantity, condition) VALUES(%s, %s, %s, %s) RETURNING equipment_id;",
@@ -1077,12 +912,7 @@ def create_equipment():
 @app.route("/equipment/<int:equipment_id>", methods=["DELETE"])
 @token_required
 def delete_equipment(equipment_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM Equipment WHERE equipment_id = %s;", (equipment_id,))
@@ -1107,12 +937,7 @@ def update_equipment(equipment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("UPDATE Equipment SET branch_id = %s, name = %s, quantity = %s, condition = %s WHERE equipment_id = %s;",
@@ -1132,12 +957,7 @@ def update_equipment(equipment_id):
 
 @app.route("/trainerbranch")
 def get_trainer_branch():
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("SELECT trainer_id,branch_id FROM trainerbranch;")
@@ -1167,12 +987,7 @@ def create_trainer_branch():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
@@ -1187,12 +1002,7 @@ def create_trainer_branch():
 @app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["DELETE"])
 @token_required
 def delete_trainer_branch(trainer_id, branch_id):
-    conn=psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn=get_db_connection()
 
     cursor=conn.cursor()
     cursor.execute("DELETE FROM TrainerBranch WHERE trainer_id = %s AND branch_id = %s;", (trainer_id, branch_id))
@@ -1211,12 +1021,7 @@ def delete_trainer_branch(trainer_id, branch_id):
 
 @app.route("/membershipplans")
 def get_membership_plans():
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT plan_id, plan_name, price, perks FROM membershipplan;")
     rows = cursor.fetchall()
@@ -1248,12 +1053,7 @@ def create_membership_plan():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO MembershipPlan (plan_name, price, perks) VALUES (%s, %s, %s) RETURNING plan_id;",
@@ -1270,12 +1070,7 @@ def create_membership_plan():
 @app.route("/membershipplans/<int:plan_id>", methods=["DELETE"])
 @token_required
 def delete_membership_plan(plan_id):
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM MembershipPlan WHERE plan_id = %s;", (plan_id,))
 
@@ -1300,12 +1095,7 @@ def update_membership_plan(plan_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
         "UPDATE MembershipPlan SET plan_name = %s, price = %s, perks = %s WHERE plan_id = %s;",
@@ -1339,12 +1129,7 @@ def create_admin():
 
     password_hash = generate_password_hash(data["password"])
 
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO Admin (name, email, phone, password_hash) VALUES (%s, %s, %s, %s) RETURNING admin_id;",
@@ -1369,12 +1154,7 @@ def login():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn = psycopg2.connect(
-        host="localhost",
-        database="gym_db",
-        user="postgres",
-        password=os.getenv("DB_PASSWORD")
-    )
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT admin_id, name, password_hash FROM Admin WHERE email = %s;", (data["email"],))
     row = cursor.fetchone()
@@ -1403,4 +1183,4 @@ def login():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    app.run(debug=False, host="0.0.0.0")
