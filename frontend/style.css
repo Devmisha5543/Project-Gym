@@ -44,7 +44,7 @@ select {
 /* ---------- Button styling ---------- */
 button {
     margin-top: 20px;
-    background-color: #c13b3b;
+    background-color: white;
     color: white;
     border: none;
     padding: 10px 16px;
