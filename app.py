@@ -29,8 +29,12 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-CORS(app, origins=["http://localhost:5173", "https://project-gym-zeta.vercel.app"])
-
+CORS(app, origins=[
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://192.168.1.4:5173",
+    "https://project-gym-zeta.vercel.app"
+])
 
 
 def token_required(f):
