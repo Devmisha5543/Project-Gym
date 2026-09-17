@@ -1,270 +1,409 @@
 import { useState, useEffect } from 'react'
+import { memberSchema } from './schemas'
 import { API_URL } from './config'
-import MemberList from './MemberList'
-import MemberForm from './MemberForm'
+import { authFetch } from './authFetch'
 import {
-  Search,
-  Users,
-  Building2,
-  UserRound
+  UserPlus,
+  Upload,
+  X,
+  ChevronDown
 } from 'lucide-react'
 
-function MembersPage() {
-  const [members, setMembers] = useState([])
+function MemberForm({ onMemberCreated }) {
+
   const [branches, setBranches] = useState([])
-  const [search, setSearch] = useState('')
-  const [branchFilter, setBranchFilter] = useState('')
-  const [genderFilter, setGenderFilter] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [branchId, setBranchId] = useState('')
+  const [name, setName] = useState('')
+  const [gender, setGender] = useState('')
+  const [phone, setPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [joinDate, setJoinDate] = useState(
+    new Date().toISOString().split('T')[0]
+  )
 
-  function loadMembers() {
-    setLoading(true)
+  const [wantsTrainer, setWantsTrainer] = useState(false)
+  const [photo, setPhoto] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
 
-    fetch(`${API_URL}/members`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to load members')
-        }
+  const [errors, setErrors] = useState({})
+  const [submitting, setSubmitting] = useState(false)
+  const [open, setOpen] = useState(false)
 
-        return response.json()
-      })
-      .then(data => {
-        setMembers(data)
-      })
-      .catch(error => {
-        console.error('Failed to load members:', error)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }
+  useEffect(() => {
 
-  function loadBranches() {
     fetch(`${API_URL}/branches`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to load branches')
-        }
-
-        return response.json()
-      })
-      .then(data => {
-        setBranches(data)
-      })
+      .then(response => response.json())
+      .then(data => setBranches(data))
       .catch(error => {
         console.error('Failed to load branches:', error)
       })
-  }
 
-  useEffect(() => {
-    loadMembers()
-    loadBranches()
   }, [])
 
-  const filteredMembers = members.filter(member => {
-    const searchText = search.toLowerCase().trim()
+  function handlePhotoChange(event) {
 
-    const matchesSearch =
-      member.name?.toLowerCase().includes(searchText) ||
-      member.phone?.toLowerCase().includes(searchText)
+    const file = event.target.files[0]
 
-    const matchesBranch =
-      !branchFilter ||
-      String(member.branch_id) === String(branchFilter)
+    if (!file) return
 
-    const matchesGender =
-      !genderFilter ||
-      member.gender?.toLowerCase() === genderFilter.toLowerCase()
+    setPhoto(file)
 
-    return (
-      matchesSearch &&
-      matchesBranch &&
-      matchesGender
+    const preview = URL.createObjectURL(file)
+
+    setPhotoPreview(preview)
+  }
+
+  function removePhoto() {
+
+    setPhoto(null)
+    setPhotoPreview(null)
+  }
+
+  function resetForm() {
+
+    setBranchId('')
+    setName('')
+    setGender('')
+    setPhone('')
+    setAddress('')
+    setJoinDate(
+      new Date().toISOString().split('T')[0]
     )
-  })
+    setWantsTrainer(false)
+    setPhoto(null)
+    setPhotoPreview(null)
+    setErrors({})
+  }
+
+  function handleSubmit(event) {
+
+    event.preventDefault()
+
+    const result = memberSchema.safeParse({
+      name,
+      phone,
+      email: ''
+    })
+
+    if (!result.success) {
+
+      const fieldErrors = {}
+
+      result.error.issues.forEach(issue => {
+        fieldErrors[issue.path[0]] = issue.message
+      })
+
+      setErrors(fieldErrors)
+
+      return
+    }
+
+    setErrors({})
+    setSubmitting(true)
+
+    const formData = new FormData()
+
+    formData.append('branch_id', branchId)
+    formData.append('name', name)
+    formData.append('gender', gender)
+    formData.append('phone', phone)
+    formData.append('address', address)
+    formData.append('join_date', joinDate)
+    formData.append('wants_trainer', wantsTrainer)
+
+    if (photo) {
+      formData.append('photo', photo)
+    }
+
+    authFetch(`${API_URL}/members`, {
+      method: 'POST',
+      body: formData
+    })
+      .then(response => {
+
+        if (!response.ok) {
+          throw new Error('Failed to create member')
+        }
+
+        return response.json()
+      })
+      .then(() => {
+
+        resetForm()
+
+        onMemberCreated()
+
+        setOpen(false)
+
+      })
+      .catch(error => {
+
+        console.error(error)
+
+        setErrors({
+          general: 'Unable to create member. Please try again.'
+        })
+
+      })
+      .finally(() => {
+        setSubmitting(false)
+      })
+  }
 
   return (
-    <div className="page-container">
+    <div className="member-form-section">
 
-      {/* Header */}
-      <div className="page-header">
+      {/* Form header */}
+      <button
+        className="add-member-header"
+        type="button"
+        onClick={() => setOpen(!open)}
+      >
 
-        <div>
-          <p className="page-eyebrow">
-            GYM MANAGEMENT
-          </p>
+        <div className="add-member-title">
 
-          <h1>
-            Members
-          </h1>
+          <div className="add-member-icon">
+            <UserPlus size={21} />
+          </div>
 
-          <p className="page-description">
-            Manage your gym members and their information.
-          </p>
-        </div>
-
-        <div className="member-total">
-
-          <Users size={20} />
-
-          <span>
-            {members.length}
-          </span>
-
-          <small>
-            Total Members
-          </small>
+          <div>
+            <strong>Add New Member</strong>
+            <span>
+              Register a new gym member
+            </span>
+          </div>
 
         </div>
 
-      </div>
+        <ChevronDown
+          size={22}
+          className={open ? 'rotate-icon' : ''}
+        />
 
-      {/* Add member */}
-      <MemberForm
-        onMemberCreated={loadMembers}
-      />
+      </button>
 
-      {/* Search / Filters */}
-      <div className="member-toolbar">
+      {/* Form */}
+      {open && (
 
-        {/* Search */}
-        <div className="search-box">
+        <form
+          className="member-form"
+          onSubmit={handleSubmit}
+        >
 
-          <label>
-            Search
-          </label>
+          {errors.general && (
+            <div className="form-error">
+              {errors.general}
+            </div>
+          )}
 
-          <div className="search-input-wrapper">
+          <div className="form-grid">
 
-            <Search size={19} />
+            <div className="form-field">
 
-            <input
-              type="text"
-              placeholder="Search members by name or phone..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+              <label>Full Name</label>
 
-            {search && (
+              <input
+                type="text"
+                placeholder="Enter member name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+
+              {errors.name && (
+                <span className="field-error">
+                  {errors.name}
+                </span>
+              )}
+
+            </div>
+
+            <div className="form-field">
+
+              <label>Phone</label>
+
+              <input
+                type="text"
+                placeholder="09XXXXXXXX"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                required
+              />
+
+              {errors.phone && (
+                <span className="field-error">
+                  {errors.phone}
+                </span>
+              )}
+
+            </div>
+
+            <div className="form-field">
+
+              <label>Gender</label>
+
+              <select
+                value={gender}
+                onChange={e => setGender(e.target.value)}
+                required
+              >
+                <option value="">
+                  Select gender
+                </option>
+
+                <option value="Male">
+                  Male
+                </option>
+
+                <option value="Female">
+                  Female
+                </option>
+
+              </select>
+
+            </div>
+
+            <div className="form-field">
+
+              <label>Branch</label>
+
+              <select
+                value={branchId}
+                onChange={e => setBranchId(e.target.value)}
+                required
+              >
+                <option value="">
+                  Select a branch
+                </option>
+
+                {branches.map(branch => (
+                  <option
+                    key={branch.branch_id}
+                    value={branch.branch_id}
+                  >
+                    {branch.name}
+                  </option>
+                ))}
+
+              </select>
+
+            </div>
+
+            <div className="form-field">
+
+              <label>Address</label>
+
+              <input
+                type="text"
+                placeholder="Member address"
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                required
+              />
+
+            </div>
+
+            <div className="form-field">
+
+              <label>Join Date</label>
+
+              <input
+                type="date"
+                value={joinDate}
+                onChange={e => setJoinDate(e.target.value)}
+                required
+              />
+
+            </div>
+
+          </div>
+
+          {/* Bottom options */}
+          <div className="form-bottom">
+
+            <label className="trainer-checkbox">
+
+              <input
+                type="checkbox"
+                checked={wantsTrainer}
+                onChange={e =>
+                  setWantsTrainer(e.target.checked)
+                }
+              />
+
+              <span>
+                Member wants a personal trainer
+              </span>
+
+            </label>
+
+            <label className="photo-upload">
+
+              <Upload size={17} />
+
+              <span>
+                {photo
+                  ? photo.name
+                  : 'Upload profile photo'}
+              </span>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+              />
+
+            </label>
+
+          </div>
+
+          {/* Preview */}
+          {photoPreview && (
+
+            <div className="photo-preview">
+
+              <img
+                src={photoPreview}
+                alt="Preview"
+              />
+
               <button
                 type="button"
-                className="clear-search"
-                onClick={() => setSearch('')}
+                onClick={removePhoto}
               >
-                ×
+                <X size={16} />
               </button>
-            )}
 
-          </div>
+            </div>
 
-        </div>
+          )}
 
-        {/* Branch Filter */}
-        <div className="filter-box">
+          <div className="form-actions">
 
-          <label>
-            Branch
-          </label>
-
-          <div className="filter-input-wrapper">
-
-            <Building2 size={18} />
-
-            <select
-              value={branchFilter}
-              onChange={e => setBranchFilter(e.target.value)}
+            <button
+              type="button"
+              className="cancel-button"
+              onClick={() => {
+                resetForm()
+                setOpen(false)
+              }}
             >
-              <option value="">
-                All Branches
-              </option>
+              Cancel
+            </button>
 
-              {branches.map(branch => (
-                <option
-                  key={branch.branch_id}
-                  value={branch.branch_id}
-                >
-                  {branch.name}
-                </option>
-              ))}
-
-            </select>
-
-          </div>
-
-        </div>
-
-        {/* Gender Filter */}
-        <div className="filter-box">
-
-          <label>
-            Gender
-          </label>
-
-          <div className="filter-input-wrapper">
-
-            <UserRound size={18} />
-
-            <select
-              value={genderFilter}
-              onChange={e => setGenderFilter(e.target.value)}
+            <button
+              type="submit"
+              className="primary-button"
+              disabled={submitting}
             >
-              <option value="">
-                All Genders
-              </option>
-
-              <option value="Male">
-                Male
-              </option>
-
-              <option value="Female">
-                Female
-              </option>
-
-            </select>
+              {submitting
+                ? 'Adding Member...'
+                : 'Add Member'}
+            </button>
 
           </div>
 
-        </div>
-
-      </div>
-
-      {/* Results */}
-      <div className="results-info">
-
-        Showing{' '}
-
-        <strong>
-          {filteredMembers.length}
-        </strong>{' '}
-
-        of{' '}
-
-        <strong>
-          {members.length}
-        </strong>{' '}
-
-        members
-
-      </div>
-
-      {/* Members */}
-      {loading ? (
-
-        <div className="loading-state">
-
-          <div className="loading-spinner"></div>
-
-          <p>
-            Loading members...
-          </p>
-
-        </div>
-
-      ) : (
-
-        <MemberList
-          members={filteredMembers}
-        />
+        </form>
 
       )}
 
@@ -272,4 +411,4 @@ function MembersPage() {
   )
 }
 
-export default MembersPage
+export default MemberForm

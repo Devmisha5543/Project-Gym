@@ -6,7 +6,10 @@ export const memberSchema = z.object({
     .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
 
   phone: z.string()
-    .regex(/^\d{7,15}$/, "Phone number must be 7 to 15 digits, no letters or symbols"),
+    .refine(value => {
+      const digits = value.replace(/\D/g, '')
+      return /^[\d\s()+-]+$/.test(value) && digits.length >= 7 && digits.length <= 15
+    }, "Phone number must contain 7 to 15 digits"),
 
   email: z.string()
     .email("Must be a valid email address")

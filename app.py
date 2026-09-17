@@ -245,15 +245,42 @@ def delete_member(member_id):
 @app.route("/members/<int:member_id>", methods=["PUT"])
 @token_required
 def update_member(member_id):
-    data = request.json
+    data = request.form if request.form else request.get_json(silent=True)
+    is_multipart = bool(request.form)
 
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
+    required_fields = (
+        ["branch_id", "name", "gender", "phone", "address", "join_date", "wants_trainer"]
+        if is_multipart else ["name", "phone"]
+    )
+    missing = [field for field in required_fields if field not in data]
+    if missing:
+        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    photo_filename = None
+    if is_multipart and "photo" in request.files:
+        file = request.files["photo"]
+        if file.filename != "":
+            photo_filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
+
     conn=get_db_connection()
     cursor=conn.cursor()
-    cursor.execute("UPDATE Member SET name = %s, phone = %s WHERE member_id = %s;",
-                   (data["name"], data["phone"], member_id))
+    if not is_multipart:
+        cursor.execute("UPDATE Member SET name = %s, phone = %s WHERE member_id = %s;",
+                       (data["name"], data["phone"], member_id))
+    elif photo_filename:
+        cursor.execute(
+            "UPDATE Member SET branch_id = %s, name = %s, gender = %s, phone = %s, address = %s, join_date = %s, wants_trainer = %s, photo_filename = %s WHERE member_id = %s;",
+            (data["branch_id"], data["name"], data["gender"], data["phone"], data["address"], data["join_date"], str(data["wants_trainer"]).lower() == "true", photo_filename, member_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE Member SET branch_id = %s, name = %s, gender = %s, phone = %s, address = %s, join_date = %s, wants_trainer = %s WHERE member_id = %s;",
+            (data["branch_id"], data["name"], data["gender"], data["phone"], data["address"], data["join_date"], str(data["wants_trainer"]).lower() == "true", member_id)
+        )
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -262,10 +289,26 @@ def update_member(member_id):
         return jsonify({"error": f"Member {member_id} not found"}), 404
 
     conn.commit()
+
+    cursor.execute("SELECT member_id, branch_id, name, gender, phone, address, join_date, wants_trainer, photo_filename FROM member WHERE member_id = %s;", (member_id,))
+    row = cursor.fetchone()
     cursor.close()
     conn.close()
 
-    return jsonify({"message":f"Member {member_id} updated"}), 200
+    return jsonify({
+        "message": f"Member {member_id} updated",
+        "member": {
+            "member_id": row[0],
+            "branch_id": row[1],
+            "name": row[2],
+            "gender": row[3],
+            "phone": row[4],
+            "address": row[5],
+            "join_date": row[6],
+            "wants_trainer": row[7],
+            "photo_filename": row[8]
+        }
+    }), 200
     
 
 @app.route("/trainers")

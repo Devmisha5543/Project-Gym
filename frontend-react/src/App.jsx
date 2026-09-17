@@ -1,4 +1,12 @@
-import { Routes, Route, NavLink } from 'react-router-dom'
+import {
+  Routes,
+  Route,
+  NavLink,
+  Navigate,
+  useNavigate,
+  Outlet
+} from 'react-router-dom'
+
 import './App.css'
 
 import MembersPage from './MembersPage'
@@ -15,6 +23,7 @@ import TrainerBranchPage from './TrainerBranchPage'
 import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
+
 
 const navigation = [
   {
@@ -55,7 +64,16 @@ const navigation = [
   },
 ]
 
-function App() {
+
+function ProtectedLayout() {
+
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    localStorage.removeItem('token')
+    navigate('/login')
+  }
+
   return (
     <div className="app-layout">
 
@@ -64,6 +82,7 @@ function App() {
 
         {/* BRAND */}
         <div className="sidebar-brand">
+
           <div className="brand-mark">
             PG
           </div>
@@ -72,21 +91,26 @@ function App() {
             <h2>Project Gym</h2>
             <span>Management</span>
           </div>
+
         </div>
+
 
         {/* NAVIGATION */}
         <nav className="sidebar-nav">
 
           {navigation.map(section => (
+
             <div
               className="nav-section"
               key={section.title}
             >
+
               <p className="nav-section-title">
                 {section.title}
               </p>
 
               {section.items.map(item => (
+
                 <NavLink
                   key={item.path}
                   to={item.path}
@@ -94,14 +118,23 @@ function App() {
                     `nav-link ${isActive ? 'active' : ''}`
                   }
                 >
+
                   <span className="nav-link-dot"></span>
-                  <span>{item.label}</span>
+
+                  <span>
+                    {item.label}
+                  </span>
+
                 </NavLink>
+
               ))}
+
             </div>
+
           ))}
 
         </nav>
+
 
         {/* SIDEBAR FOOTER */}
         <div className="sidebar-footer">
@@ -120,6 +153,7 @@ function App() {
             <button
               className="logout-button"
               title="Log out"
+              onClick={handleLogout}
             >
               Logout
             </button>
@@ -130,97 +164,152 @@ function App() {
 
       </aside>
 
+
       {/* MAIN CONTENT */}
       <main className="main-content">
-
-        <Routes>
-
-          <Route
-            path="/"
-            element={
-              <div className="page-placeholder">
-                <h1>Welcome</h1>
-                <p>Select a page from the sidebar.</p>
-              </div>
-            }
-          />
-
-          <Route
-            path="/dashboard"
-            element={<DashboardPage />}
-          />
-
-          <Route
-            path="/members"
-            element={<MembersPage />}
-          />
-
-          <Route
-            path="/branches"
-            element={<BranchPage />}
-          />
-
-          <Route
-            path="/trainers"
-            element={<TrainerPage />}
-          />
-
-          <Route
-            path="/membershipplans"
-            element={<MembershipPlanPage />}
-          />
-
-          <Route
-            path="/memberships"
-            element={<MembershipPage />}
-          />
-
-          <Route
-            path="/personaltrainingassignments"
-            element={<PersonalTrainingAssignmentPage />}
-          />
-
-          <Route
-            path="/classes"
-            element={<ClassPage />}
-          />
-
-          <Route
-            path="/classbookings"
-            element={<ClassBookingPage />}
-          />
-
-          <Route
-            path="/payments"
-            element={<PaymentPage />}
-          />
-
-          <Route
-            path="/equipment"
-            element={<EquipmentPage />}
-          />
-
-          <Route
-            path="/trainerbranch"
-            element={<TrainerBranchPage />}
-          />
-
-          <Route
-            path="/admins"
-            element={<AdminPage />}
-          />
-
-          <Route
-            path="/login"
-            element={<LoginPage />}
-          />
-
-        </Routes>
-
+        <Outlet />
       </main>
 
     </div>
   )
 }
+
+
+function ProtectedRoute() {
+
+  const token = localStorage.getItem('token')
+
+  if (!token) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <ProtectedLayout />
+}
+
+
+function LoginRoute() {
+
+  const token = localStorage.getItem('token')
+
+  if (token) {
+    return <Navigate to="/dashboard" replace />
+  }
+
+  return <LoginPage />
+}
+
+
+function App() {
+
+  return (
+    <Routes>
+
+      {/* LOGIN */}
+      <Route
+        path="/login"
+        element={<LoginRoute />}
+      />
+
+
+      {/* PROTECTED ROUTES */}
+      <Route
+        element={<ProtectedRoute />}
+      >
+
+        <Route
+          path="/dashboard"
+          element={<DashboardPage />}
+        />
+
+        <Route
+          path="/members"
+          element={<MembersPage />}
+        />
+
+        <Route
+          path="/branches"
+          element={<BranchPage />}
+        />
+
+        <Route
+          path="/trainers"
+          element={<TrainerPage />}
+        />
+
+        <Route
+          path="/membershipplans"
+          element={<MembershipPlanPage />}
+        />
+
+        <Route
+          path="/memberships"
+          element={<MembershipPage />}
+        />
+
+        <Route
+          path="/personaltrainingassignments"
+          element={<PersonalTrainingAssignmentPage />}
+        />
+
+        <Route
+          path="/classes"
+          element={<ClassPage />}
+        />
+
+        <Route
+          path="/classbookings"
+          element={<ClassBookingPage />}
+        />
+
+        <Route
+          path="/payments"
+          element={<PaymentPage />}
+        />
+
+        <Route
+          path="/equipment"
+          element={<EquipmentPage />}
+        />
+
+        <Route
+          path="/trainerbranch"
+          element={<TrainerBranchPage />}
+        />
+
+        <Route
+          path="/admins"
+          element={<AdminPage />}
+        />
+
+      </Route>
+
+
+      {/* DEFAULT */}
+      <Route
+        path="/"
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
+      />
+
+
+      {/* UNKNOWN URL */}
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/dashboard"
+            replace
+          />
+        }
+      />
+
+    </Routes>
+  )
+}
+
 
 export default App
