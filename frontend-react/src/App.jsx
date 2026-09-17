@@ -1,6 +1,6 @@
 import { Routes, Route, NavLink } from 'react-router-dom'
-import { API_URL } from './config'
 import './App.css'
+
 import MembersPage from './MembersPage'
 import BranchPage from './BranchPage'
 import TrainerPage from './TrainerPage'
@@ -16,47 +16,209 @@ import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
 
+const navigation = [
+  {
+    title: 'Main',
+    items: [
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/members', label: 'Members' },
+      { path: '/branches', label: 'Branches' },
+      { path: '/trainers', label: 'Trainers' },
+    ],
+  },
+  {
+    title: 'Management',
+    items: [
+      { path: '/membershipplans', label: 'Membership Plans' },
+      { path: '/memberships', label: 'Memberships' },
+      {
+        path: '/personaltrainingassignments',
+        label: 'PT Assignments',
+      },
+      { path: '/classes', label: 'Classes' },
+      { path: '/classbookings', label: 'Class Bookings' },
+      { path: '/payments', label: 'Payments' },
+      { path: '/equipment', label: 'Equipment' },
+    ],
+  },
+  {
+    title: 'Relationships',
+    items: [
+      { path: '/trainerbranch', label: 'Trainer Branch' },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { path: '/admins', label: 'Admins' },
+    ],
+  },
+]
+
 function App() {
   return (
     <div className="app-layout">
+
+      {/* SIDEBAR */}
       <aside className="sidebar">
-        <h2>Gym Admin</h2>
-        <nav>
-          <NavLink to="/dashboard">Dashboard</NavLink>
-          <NavLink to="/members">Members</NavLink>
-          <NavLink to="/branches">Branches</NavLink>
-          <NavLink to="/trainers">Trainers</NavLink>
-          <NavLink to="/membershipplans">Membership Plans</NavLink>
-          <NavLink to="/memberships">Memberships</NavLink>
-          <NavLink to="/personaltrainingassignments">PT Assignments</NavLink>
-          <NavLink to="/classes">Classes</NavLink>
-          <NavLink to="/classbookings">Class Bookings</NavLink>
-          <NavLink to="/payments">Payments</NavLink>
-          <NavLink to="/equipment">Equipment</NavLink>
-          <NavLink to="/trainerbranch">Trainer Branch</NavLink>
-          <NavLink to="/admins">Admins</NavLink>
+
+        {/* BRAND */}
+        <div className="sidebar-brand">
+          <div className="brand-mark">
+            PG
+          </div>
+
+          <div className="brand-text">
+            <h2>Project Gym</h2>
+            <span>Management</span>
+          </div>
+        </div>
+
+        {/* NAVIGATION */}
+        <nav className="sidebar-nav">
+
+          {navigation.map(section => (
+            <div
+              className="nav-section"
+              key={section.title}
+            >
+              <p className="nav-section-title">
+                {section.title}
+              </p>
+
+              {section.items.map(item => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `nav-link ${isActive ? 'active' : ''}`
+                  }
+                >
+                  <span className="nav-link-dot"></span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          ))}
+
         </nav>
+
+        {/* SIDEBAR FOOTER */}
+        <div className="sidebar-footer">
+
+          <div className="admin-profile">
+
+            <div className="admin-avatar">
+              A
+            </div>
+
+            <div className="admin-info">
+              <strong>Admin</strong>
+              <span>Administrator</span>
+            </div>
+
+            <button
+              className="logout-button"
+              title="Log out"
+            >
+              Logout
+            </button>
+
+          </div>
+
+        </div>
+
       </aside>
 
+      {/* MAIN CONTENT */}
       <main className="main-content">
+
         <Routes>
-          <Route path="/" element={<h1>Welcome — select a page</h1>} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/members" element={<MembersPage />} />
-          <Route path="/branches" element={<BranchPage />} />
-          <Route path="/trainers" element={<TrainerPage />} />
-          <Route path="/membershipplans" element={<MembershipPlanPage />} />
-          <Route path="/memberships" element={<MembershipPage />} />
-          <Route path="/personaltrainingassignments" element={<PersonalTrainingAssignmentPage />} />
-          <Route path="/classes" element={<ClassPage />} />
-          <Route path="/classbookings" element={<ClassBookingPage />} />
-          <Route path="/payments" element={<PaymentPage />} />
-          <Route path="/equipment" element={<EquipmentPage />} />
-          <Route path="/trainerbranch" element={<TrainerBranchPage />} />
-          <Route path="/admins" element={<AdminPage />} />
-          <Route path="/login" element={<LoginPage />} />
+
+          <Route
+            path="/"
+            element={
+              <div className="page-placeholder">
+                <h1>Welcome</h1>
+                <p>Select a page from the sidebar.</p>
+              </div>
+            }
+          />
+
+          <Route
+            path="/dashboard"
+            element={<DashboardPage />}
+          />
+
+          <Route
+            path="/members"
+            element={<MembersPage />}
+          />
+
+          <Route
+            path="/branches"
+            element={<BranchPage />}
+          />
+
+          <Route
+            path="/trainers"
+            element={<TrainerPage />}
+          />
+
+          <Route
+            path="/membershipplans"
+            element={<MembershipPlanPage />}
+          />
+
+          <Route
+            path="/memberships"
+            element={<MembershipPage />}
+          />
+
+          <Route
+            path="/personaltrainingassignments"
+            element={<PersonalTrainingAssignmentPage />}
+          />
+
+          <Route
+            path="/classes"
+            element={<ClassPage />}
+          />
+
+          <Route
+            path="/classbookings"
+            element={<ClassBookingPage />}
+          />
+
+          <Route
+            path="/payments"
+            element={<PaymentPage />}
+          />
+
+          <Route
+            path="/equipment"
+            element={<EquipmentPage />}
+          />
+
+          <Route
+            path="/trainerbranch"
+            element={<TrainerBranchPage />}
+          />
+
+          <Route
+            path="/admins"
+            element={<AdminPage />}
+          />
+
+          <Route
+            path="/login"
+            element={<LoginPage />}
+          />
+
         </Routes>
+
       </main>
+
     </div>
   )
 }

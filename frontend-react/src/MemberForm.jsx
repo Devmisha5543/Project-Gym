@@ -1,124 +1,275 @@
 import { useState, useEffect } from 'react'
-import { memberSchema } from './schemas'
 import { API_URL } from './config'
-import { authFetch } from './authFetch'
+import MemberList from './MemberList'
+import MemberForm from './MemberForm'
+import {
+  Search,
+  Users,
+  Building2,
+  UserRound
+} from 'lucide-react'
 
-function MemberForm({ onMemberCreated }) {
+function MembersPage() {
+  const [members, setMembers] = useState([])
   const [branches, setBranches] = useState([])
-  const [branchId, setBranchId] = useState('')
-  const [name, setName] = useState('')
-  const [gender, setGender] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
-  const [joinDate, setJoinDate] = useState(new Date().toISOString().split('T')[0])
-  const [wantsTrainer, setWantsTrainer] = useState(false)
-  const [photo, setPhoto] = useState(null)
-  const [errors, setErrors] = useState({})
+  const [search, setSearch] = useState('')
+  const [branchFilter, setBranchFilter] = useState('')
+  const [genderFilter, setGenderFilter] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetch(`${API_URL}/branches`)
-      .then(response => response.json())
-      .then(data => setBranches(data))
-  }, [])
+  function loadMembers() {
+    setLoading(true)
 
-  function handleSubmit(event) {
-    event.preventDefault()
+    fetch(`${API_URL}/members`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load members')
+        }
 
-    const result = memberSchema.safeParse({
-      name,
-      phone,
-      email: ''
-    })
-
-    if (!result.success) {
-      const fieldErrors = {}
-      result.error.issues.forEach(issue => {
-        fieldErrors[issue.path[0]] = issue.message
+        return response.json()
       })
-      setErrors(fieldErrors)
-      return
-    }
-
-    setErrors({})
-
-    const formData = new FormData()
-    formData.append("branch_id", branchId)
-    formData.append("name", name)
-    formData.append("gender", gender)
-    formData.append("phone", phone)
-    formData.append("address", address)
-    formData.append("join_date", joinDate)
-    formData.append("wants_trainer", wantsTrainer)
-    if (photo) {
-      formData.append("photo", photo)
-    }
-
-    authFetch(`${API_URL}/members`, {
-      method: "POST",
-      body: formData
-    })
-      .then(response => response.json())
-      .then(() => {
-        setName('')
-        setGender('')
-        setPhone('')
-        setAddress('')
-        setWantsTrainer(false)
-        setPhoto(null)
-        onMemberCreated()
+      .then(data => {
+        setMembers(data)
+      })
+      .catch(error => {
+        console.error('Failed to load members:', error)
+      })
+      .finally(() => {
+        setLoading(false)
       })
   }
 
+  function loadBranches() {
+    fetch(`${API_URL}/branches`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load branches')
+        }
+
+        return response.json()
+      })
+      .then(data => {
+        setBranches(data)
+      })
+      .catch(error => {
+        console.error('Failed to load branches:', error)
+      })
+  }
+
+  useEffect(() => {
+    loadMembers()
+    loadBranches()
+  }, [])
+
+  const filteredMembers = members.filter(member => {
+    const searchText = search.toLowerCase().trim()
+
+    const matchesSearch =
+      member.name?.toLowerCase().includes(searchText) ||
+      member.phone?.toLowerCase().includes(searchText)
+
+    const matchesBranch =
+      !branchFilter ||
+      String(member.branch_id) === String(branchFilter)
+
+    const matchesGender =
+      !genderFilter ||
+      member.gender?.toLowerCase() === genderFilter.toLowerCase()
+
+    return (
+      matchesSearch &&
+      matchesBranch &&
+      matchesGender
+    )
+  })
+
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Branch:</label>
-      <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
-        <option value="">-- Select a branch --</option>
-        {branches.map(branch => (
-          <option key={branch.branch_id} value={branch.branch_id}>
-            {branch.name}
-          </option>
-        ))}
-      </select>
-      <br /><br />
+    <div className="page-container">
 
-      <label>Name:</label>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} required />
-      {errors.name && <p style={{ color: '#dc2626' }}>{errors.name}</p>}
-      <br /><br />
+      {/* Header */}
+      <div className="page-header">
 
-      <label>Gender:</label>
-      <select value={gender} onChange={e => setGender(e.target.value)} required>
-        <option value="">-- Select --</option>
-        <option value="Male">Male</option>
-        <option value="Female">Female</option>
-      </select>
-      <br /><br />
+        <div>
+          <p className="page-eyebrow">
+            GYM MANAGEMENT
+          </p>
 
-      <label>Phone:</label>
-      <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required />
-      {errors.phone && <p style={{ color: '#dc2626' }}>{errors.phone}</p>}
-      <br /><br />
+          <h1>
+            Members
+          </h1>
 
-      <label>Address:</label>
-      <input type="text" value={address} onChange={e => setAddress(e.target.value)} required />
-      <br /><br />
+          <p className="page-description">
+            Manage your gym members and their information.
+          </p>
+        </div>
 
-      <label>Join Date:</label>
-      <input type="date" value={joinDate} onChange={e => setJoinDate(e.target.value)} required />
-      <br /><br />
+        <div className="member-total">
 
-      <label>Wants a Trainer?</label>
-      <input type="checkbox" checked={wantsTrainer} onChange={e => setWantsTrainer(e.target.checked)} />
-      <br /><br />
+          <Users size={20} />
 
-      <label>Photo:</label>
-      <input type="file" accept="image/*" onChange={e => setPhoto(e.target.files[0])} />
-      <br /><br />
+          <span>
+            {members.length}
+          </span>
 
-      <button type="submit">Add Member</button>
-    </form>
+          <small>
+            Total Members
+          </small>
+
+        </div>
+
+      </div>
+
+      {/* Add member */}
+      <MemberForm
+        onMemberCreated={loadMembers}
+      />
+
+      {/* Search / Filters */}
+      <div className="member-toolbar">
+
+        {/* Search */}
+        <div className="search-box">
+
+          <label>
+            Search
+          </label>
+
+          <div className="search-input-wrapper">
+
+            <Search size={19} />
+
+            <input
+              type="text"
+              placeholder="Search members by name or phone..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+
+            {search && (
+              <button
+                type="button"
+                className="clear-search"
+                onClick={() => setSearch('')}
+              >
+                ×
+              </button>
+            )}
+
+          </div>
+
+        </div>
+
+        {/* Branch Filter */}
+        <div className="filter-box">
+
+          <label>
+            Branch
+          </label>
+
+          <div className="filter-input-wrapper">
+
+            <Building2 size={18} />
+
+            <select
+              value={branchFilter}
+              onChange={e => setBranchFilter(e.target.value)}
+            >
+              <option value="">
+                All Branches
+              </option>
+
+              {branches.map(branch => (
+                <option
+                  key={branch.branch_id}
+                  value={branch.branch_id}
+                >
+                  {branch.name}
+                </option>
+              ))}
+
+            </select>
+
+          </div>
+
+        </div>
+
+        {/* Gender Filter */}
+        <div className="filter-box">
+
+          <label>
+            Gender
+          </label>
+
+          <div className="filter-input-wrapper">
+
+            <UserRound size={18} />
+
+            <select
+              value={genderFilter}
+              onChange={e => setGenderFilter(e.target.value)}
+            >
+              <option value="">
+                All Genders
+              </option>
+
+              <option value="Male">
+                Male
+              </option>
+
+              <option value="Female">
+                Female
+              </option>
+
+            </select>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Results */}
+      <div className="results-info">
+
+        Showing{' '}
+
+        <strong>
+          {filteredMembers.length}
+        </strong>{' '}
+
+        of{' '}
+
+        <strong>
+          {members.length}
+        </strong>{' '}
+
+        members
+
+      </div>
+
+      {/* Members */}
+      {loading ? (
+
+        <div className="loading-state">
+
+          <div className="loading-spinner"></div>
+
+          <p>
+            Loading members...
+          </p>
+
+        </div>
+
+      ) : (
+
+        <MemberList
+          members={filteredMembers}
+        />
+
+      )}
+
+    </div>
   )
 }
 
-export default MemberForm
+export default MembersPage
