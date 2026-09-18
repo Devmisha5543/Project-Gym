@@ -33,6 +33,7 @@ CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://192.168.1.4:5173",
+    "http://192.168.1.3:5173",
     "https://project-gym-zeta.vercel.app"
 ])
 
@@ -436,7 +437,10 @@ def get_expiring_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT membership.membership_id, member.name, member.phone, membership.end_date, membership.status
+        SELECT membership.membership_id, membership.member_id, member.branch_id,
+               member.name, member.gender, member.phone, member.address,
+               member.join_date, member.wants_trainer, member.photo_filename,
+               membership.start_date, membership.end_date, membership.status
         FROM membership
         JOIN member ON membership.member_id = member.member_id
         WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
@@ -451,10 +455,20 @@ def get_expiring_memberships():
     for row in rows:
         expiring.append({
             "membership_id": row[0],
-            "member_name": row[1],
-            "member_phone": row[2],
-            "end_date": row[3].isoformat(),
-            "status": row[4]
+            "member_id": row[1],
+            "branch_id": row[2],
+            "member_name": row[3],
+            "name": row[3],
+            "gender": row[4],
+            "member_phone": row[5],
+            "phone": row[5],
+            "address": row[6],
+            "join_date": row[7],
+            "wants_trainer": row[8],
+            "photo_filename": row[9],
+            "start_date": row[10].isoformat(),
+            "end_date": row[11].isoformat(),
+            "status": row[12]
         })
 
     return jsonify(expiring)
