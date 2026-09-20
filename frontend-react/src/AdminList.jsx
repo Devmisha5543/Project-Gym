@@ -1,13 +1,12 @@
-import { API_URL } from './config'
+import { ShieldCheck, UserRound } from 'lucide-react'
 function AdminList({ admins }) {
+  if (admins.length === 0) return <div className="admin-state"><div className="admin-state-icon"><ShieldCheck size={25} /></div><h3>No admin records visible</h3><p>New accounts are created above. The current API does not return an admin list.</p></div>
   return (
-    <ul>
+    <div className="admin-list">
       {admins.map(admin => (
-        <li key={admin.admin_id}>
-          {admin.name} - {admin.email} - {admin.phone}
-        </li>
+        <article className="admin-card" key={admin.admin_id}><div className="admin-card-icon"><UserRound size={20} /></div><div><span className="admin-card-label">Administrator #{admin.admin_id}</span><h2>{admin.name}</h2><div className="admin-card-details"><span>{admin.email}</span><span>{admin.phone}</span></div></div></article>
       ))}
-    </ul>
+    </div>
   )
 }
 

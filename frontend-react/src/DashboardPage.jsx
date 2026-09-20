@@ -1,5 +1,17 @@
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
+import MemberDetail from './MemberDetail'
+import {
+  Activity,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  CreditCard,
+  Dumbbell,
+  RefreshCw,
+  Users,
+  Wrench
+} from 'lucide-react'
 
 function DashboardPage() {
   const [expiring, setExpiring] = useState([])
@@ -7,6 +19,8 @@ function DashboardPage() {
   const [classCount, setClassCount] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [selectedMembership, setSelectedMembership] = useState(null)
+  const [branches, setBranches] = useState([])
 
   function loadDashboard() {
     setLoading(true)
@@ -16,8 +30,9 @@ function DashboardPage() {
       fetch(`${API_URL}/classes`).then(response => response.json()),
       fetch(`${API_URL}/payments`).then(response => response.json()),
       fetch(`${API_URL}/memberships/expiring`).then(response => response.json()),
+      fetch(`${API_URL}/branches`).then(response => response.json()),
     ])
-      .then(([members, classes, payments, expiringMemberships]) => {
+      .then(([members, classes, payments, expiringMemberships, branchData]) => {
         setMemberCount(Array.isArray(members) ? members.length : 0)
         setClassCount(Array.isArray(classes) ? classes.length : 0)
 
@@ -35,6 +50,7 @@ function DashboardPage() {
             ? expiringMemberships
             : []
         )
+          setBranches(Array.isArray(branchData) ? branchData : [])
       })
       .catch(error => {
         console.error('Dashboard loading error:', error)
@@ -45,7 +61,8 @@ function DashboardPage() {
   }
 
   useEffect(() => {
-    loadDashboard()
+    const loadTimer = setTimeout(loadDashboard, 0)
+    return () => clearTimeout(loadTimer)
   }, [])
 
   return (
@@ -73,6 +90,7 @@ function DashboardPage() {
           onClick={loadDashboard}
           disabled={loading}
         >
+          <RefreshCw size={15} className={loading ? 'refresh-icon-spinning' : ''} />
           {loading ? 'Refreshing...' : 'Refresh data'}
         </button>
 
@@ -89,7 +107,7 @@ function DashboardPage() {
             </span>
 
             <span className="stat-icon">
-              M
+              <Users size={16} />
             </span>
           </div>
 
@@ -110,7 +128,7 @@ function DashboardPage() {
             </span>
 
             <span className="stat-icon">
-              C
+              <CalendarDays size={16} />
             </span>
           </div>
 
@@ -131,7 +149,7 @@ function DashboardPage() {
             </span>
 
             <span className="stat-icon">
-              $
+              <CreditCard size={16} />
             </span>
           </div>
 
@@ -173,7 +191,7 @@ function DashboardPage() {
             className="quick-action"
           >
             <span className="quick-action-symbol">
-              +
+              <Users size={17} />
             </span>
 
             <div>
@@ -188,7 +206,7 @@ function DashboardPage() {
             className="quick-action"
           >
             <span className="quick-action-symbol">
-              $
+              <CreditCard size={17} />
             </span>
 
             <div>
@@ -203,7 +221,7 @@ function DashboardPage() {
             className="quick-action"
           >
             <span className="quick-action-symbol">
-              C
+              <Dumbbell size={17} />
             </span>
 
             <div>
@@ -218,7 +236,7 @@ function DashboardPage() {
             className="quick-action"
           >
             <span className="quick-action-symbol">
-              E
+              <Wrench size={17} />
             </span>
 
             <div>
@@ -239,7 +257,7 @@ function DashboardPage() {
 
           <div>
             <p className="dashboard-eyebrow">
-              ATTENTION NEEDED
+              <Activity size={13} /> ATTENTION NEEDED
             </p>
 
             <h2>
@@ -278,7 +296,7 @@ function DashboardPage() {
             <div className="dashboard-empty">
 
               <div className="empty-symbol">
-                ✓
+                <CheckCircle2 size={19} />
               </div>
 
               <h3>
@@ -326,7 +344,7 @@ function DashboardPage() {
 
                   <div className="expiry-date">
 
-                    <span>
+                    <span className="expiry-label">
                       Expires
                     </span>
 
@@ -336,13 +354,19 @@ function DashboardPage() {
 
                   </div>
 
+                  <span className="expiry-status">
+                    <span className="expiry-status-dot"></span>
+                    Due soon
+                  </span>
 
-                  <a
-                    href="/memberships"
+
+                  <button
+                    type="button"
                     className="member-action"
+                    onClick={() => setSelectedMembership(membership)}
                   >
-                    View
-                  </a>
+                    View <ArrowUpRight size={14} />
+                  </button>
 
                 </div>
 
@@ -355,6 +379,29 @@ function DashboardPage() {
         </div>
 
       </section>
+
+      {selectedMembership && (
+        <div
+          className="member-detail-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${selectedMembership.name || selectedMembership.member_name} details`}
+          onClick={event => {
+            if (event.target === event.currentTarget) setSelectedMembership(null)
+          }}
+        >
+          <div className="member-detail-modal-panel">
+            <MemberDetail
+              member={selectedMembership}
+              branches={branches}
+              membership={selectedMembership}
+              onMemberUpdated={updatedMember => setSelectedMembership(current => ({ ...current, ...updatedMember }))}
+              onMemberDeleted={() => setSelectedMembership(null)}
+              onClose={() => setSelectedMembership(null)}
+            />
+          </div>
+        </div>
+      )}
 
     </div>
   )

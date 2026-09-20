@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { personalTrainingAssignmentSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { Activity, CalendarDays, Check, Dumbbell, UserRound, Users } from 'lucide-react'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -62,48 +63,86 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Trainer:</label>
-      <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
-        <option value="">-- Select a trainer --</option>
-        {trainers.map(trainer => (
-          <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
-        ))}
-      </select>
-      {errors.trainerId && <p style={{ color: '#dc2626' }}>{errors.trainerId}</p>}
-      <br /><br />
+    <section className="pt-assignment-form-section">
+      <div className="pt-assignment-form-heading">
+        <div className="pt-assignment-form-icon">
+          <Activity size={19} />
+        </div>
+        <div>
+          <h2>Assign Personal Training</h2>
+          <p>Pair a member with a trainer and define the coaching engagement.</p>
+        </div>
+      </div>
 
-      <label>Member:</label>
-      <select value={memberId} onChange={e => setMemberId(e.target.value)} required>
-        <option value="">-- Select a member --</option>
-        {members.map(member => (
-          <option key={member.member_id} value={member.member_id}>{member.name}</option>
-        ))}
-      </select>
-      {errors.memberId && <p style={{ color: '#dc2626' }}>{errors.memberId}</p>}
-      <br /><br />
+      <form className="pt-assignment-form" onSubmit={handleSubmit}>
+        <div className="pt-assignment-form-grid">
+          <label className="pt-assignment-field">
+            <span>Trainer</span>
+            <div className="pt-assignment-input-wrap">
+              <Dumbbell size={16} />
+              <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
+                <option value="">Select a trainer</option>
+                {trainers.map(trainer => (
+                  <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
+                ))}
+              </select>
+            </div>
+            {errors.trainerId && <small className="pt-assignment-field-error">{errors.trainerId}</small>}
+          </label>
 
-      <label>Speciality:</label>
-      <input type="text" value={speciality} onChange={e => setSpeciality(e.target.value)} required />
-      <br /><br />
+          <label className="pt-assignment-field">
+            <span>Member</span>
+            <div className="pt-assignment-input-wrap">
+              <UserRound size={16} />
+              <select value={memberId} onChange={e => setMemberId(e.target.value)} required>
+                <option value="">Select a member</option>
+                {members.map(member => (
+                  <option key={member.member_id} value={member.member_id}>{member.name}</option>
+                ))}
+              </select>
+            </div>
+            {errors.memberId && <small className="pt-assignment-field-error">{errors.memberId}</small>}
+          </label>
 
-      <label>Start_Date:</label>
-      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
-      {errors.startDate && <p style={{ color: '#dc2626' }}>{errors.startDate}</p>}
-      <br /><br />
+          <label className="pt-assignment-field">
+            <span>Speciality</span>
+            <div className="pt-assignment-input-wrap">
+              <Users size={16} />
+              <input type="text" value={speciality} onChange={e => setSpeciality(e.target.value)} required placeholder="e.g. Strength training" />
+            </div>
+          </label>
 
-      <label>Status:</label>
-      <select value={status} onChange={e => setStatus(e.target.value)} required>
-        <option value="">-- Select status --</option>
-        <option value="active">Active</option>
-        <option value="paused">Paused</option>
-        <option value="completed">Completed</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-      <br /><br />
+          <label className="pt-assignment-field">
+            <span>Start date</span>
+            <div className="pt-assignment-input-wrap">
+              <CalendarDays size={16} />
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
+            </div>
+            {errors.startDate && <small className="pt-assignment-field-error">{errors.startDate}</small>}
+          </label>
 
-      <button type="submit">Add Assignment</button>
-    </form>
+          <label className="pt-assignment-field">
+            <span>Status</span>
+            <div className="pt-assignment-input-wrap">
+              <Activity size={16} />
+              <select value={status} onChange={e => setStatus(e.target.value)} required>
+                <option value="">Select status</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+          </label>
+        </div>
+
+        <div className="pt-assignment-form-actions">
+          <button type="submit" className="pt-assignment-primary-button">
+            <Check size={16} /> Add Assignment
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

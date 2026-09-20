@@ -1,18 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { API_URL } from './config'
 import MemberList from './MemberList'
 import MemberForm from './MemberForm'
-import { Search, Users, Building2 } from 'lucide-react'
+import { Search, Users, Building2, Filter, X } from 'lucide-react'
+
+function subscribeToMobile(callback) {
+  const mql = window.matchMedia('(max-width: 768px)')
+  mql.addEventListener('change', callback)
+  return () => mql.removeEventListener('change', callback)
+}
+
+function getMobileSnapshot() {
+  return window.matchMedia('(max-width: 768px)').matches
+}
+
+function getMobileServerSnapshot() {
+  return false
+}
 
 function MembersPage() {
+  const isMobile = useSyncExternalStore(
+    subscribeToMobile,
+    getMobileSnapshot,
+    getMobileServerSnapshot
+  )
   const [members, setMembers] = useState([])
   const [branches, setBranches] = useState([])
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('')
   const [genderFilter, setGenderFilter] = useState('')
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  const [tempBranch, setTempBranch] = useState('')
+  const [tempGender, setTempGender] = useState('')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
-  const [memberFeedback, setMemberFeedback] = useState(null)
+
+  function openMobileFilter() {
+    setTempBranch(branchFilter)
+    setTempGender(genderFilter)
+    setMobileFilterOpen(true)
+  }
+
+  function applyMobileFilter() {
+    setBranchFilter(tempBranch)
+    setGenderFilter(tempGender)
+    setMobileFilterOpen(false)
+  }
+
+  function clearMobileFilter() {
+    setTempBranch('')
+    setTempGender('')
+    setBranchFilter('')
+    setGenderFilter('')
+    setMobileFilterOpen(false)
+  }
+
+  useEffect(() => {
+    if (!mobileFilterOpen) return undefined
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') setMobileFilterOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [mobileFilterOpen])
 
   function handleMemberUpdated(updatedMember) {
     setMembers(currentMembers => currentMembers.map(member => (
@@ -24,11 +74,6 @@ function MembersPage() {
     setMembers(currentMembers => currentMembers.filter(member => (
       member.member_id !== memberId
     )))
-  }
-
-  function showMemberFeedback(message, type) {
-    setMemberFeedback({ message, type })
-    window.setTimeout(() => setMemberFeedback(null), 4500)
   }
 
   function loadMembers() {
@@ -94,8 +139,11 @@ function MembersPage() {
   }
 
   useEffect(() => {
-    loadMembers()
-    loadBranches()
+    const timer = setTimeout(() => {
+      loadMembers()
+      loadBranches()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const filteredMembers = members.filter(member => {
@@ -163,7 +211,7 @@ function MembersPage() {
         {/* Search */}
         <div className="search-box">
 
-          <label>
+          <label className="search-box-label">
             Search Members
           </label>
 
@@ -183,6 +231,7 @@ function MembersPage() {
                 type="button"
                 className="clear-search"
                 onClick={() => setSearch('')}
+                aria-label="Clear search"
               >
                 ×
               </button>
@@ -192,78 +241,179 @@ function MembersPage() {
 
         </div>
 
+        {/* Mobile Filter Button */}
+        {isMobile && (
+          <button
+            type="button"
+            className={`mobile-filter-trigger ${(branchFilter || genderFilter) ? 'active' : ''}`}
+            onClick={openMobileFilter}
+            aria-label="Filter members"
+          >
+            <Filter size={17} />
+            <span>Filter</span>
+            {(branchFilter || genderFilter) && (
+              <span className="mobile-filter-dot" />
+            )}
+          </button>
+        )}
 
-        {/* Branch Filter */}
-        <div className="filter-box">
+        {/* Desktop Branch Filter */}
+        {!isMobile && (
+          <div className="filter-box">
 
-          <label>
-            Branch
-          </label>
+            <label>
+              Branch
+            </label>
 
-          <div className="field-with-icon">
+            <div className="field-with-icon">
 
-            <Building2 size={18} />
+              <Building2 size={18} />
 
-            <select
-              value={branchFilter}
-              onChange={e => setBranchFilter(e.target.value)}
-            >
+              <select
+                value={branchFilter}
+                onChange={e => setBranchFilter(e.target.value)}
+              >
 
-              <option value="">
-                All Branches
-              </option>
-
-              {branches.map(branch => (
-                <option
-                  key={branch.branch_id}
-                  value={branch.branch_id}
-                >
-                  {branch.name}
+                <option value="">
+                  All Branches
                 </option>
-              ))}
 
-            </select>
+                {branches.map(branch => (
+                  <option
+                    key={branch.branch_id}
+                    value={branch.branch_id}
+                  >
+                    {branch.name}
+                  </option>
+                ))}
 
-          </div>
+              </select>
 
-        </div>
-
-
-        {/* Gender Filter */}
-        <div className="filter-box">
-
-          <label>
-            Gender
-          </label>
-
-          <div className="field-with-icon">
-
-            <Users size={18} />
-
-            <select
-              value={genderFilter}
-              onChange={e => setGenderFilter(e.target.value)}
-            >
-
-              <option value="">
-                All Genders
-              </option>
-
-              <option value="Male">
-                Male
-              </option>
-
-              <option value="Female">
-                Female
-              </option>
-
-            </select>
+            </div>
 
           </div>
+        )}
 
-        </div>
+        {/* Desktop Gender Filter */}
+        {!isMobile && (
+          <div className="filter-box">
+
+            <label>
+              Gender
+            </label>
+
+            <div className="field-with-icon">
+
+              <Users size={18} />
+
+              <select
+                value={genderFilter}
+                onChange={e => setGenderFilter(e.target.value)}
+              >
+
+                <option value="">
+                  All Genders
+                </option>
+
+                <option value="Male">
+                  Male
+                </option>
+
+                <option value="Female">
+                  Female
+                </option>
+
+              </select>
+
+            </div>
+
+          </div>
+        )}
 
       </div>
+
+      {/* Mobile Filter Bottom Sheet Modal */}
+      {isMobile && mobileFilterOpen && (
+        <div
+          className="mobile-filter-overlay"
+          onClick={() => setMobileFilterOpen(false)}
+          aria-hidden="true"
+        >
+          <div
+            className="mobile-filter-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter members"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="mobile-sheet-drag-handle" />
+
+            <div className="mobile-filter-header">
+              <h3>Filters</h3>
+              <button
+                type="button"
+                className="mobile-filter-close"
+                onClick={() => setMobileFilterOpen(false)}
+                aria-label="Close filter options"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mobile-filter-body">
+              <div className="mobile-filter-group">
+                <label>Branch</label>
+                <div className="mobile-filter-select-wrap">
+                  <Building2 size={17} />
+                  <select
+                    value={tempBranch}
+                    onChange={e => setTempBranch(e.target.value)}
+                  >
+                    <option value="">All branches</option>
+                    {branches.map(branch => (
+                      <option key={branch.branch_id} value={branch.branch_id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mobile-filter-group">
+                <label>Gender</label>
+                <div className="mobile-filter-select-wrap">
+                  <Users size={17} />
+                  <select
+                    value={tempGender}
+                    onChange={e => setTempGender(e.target.value)}
+                  >
+                    <option value="">All genders</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="mobile-filter-actions">
+              <button
+                type="button"
+                className="mobile-filter-clear-btn"
+                onClick={clearMobileFilter}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                className="mobile-filter-apply-btn"
+                onClick={applyMobileFilter}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* Results */}
@@ -274,12 +424,6 @@ function MembersPage() {
         <strong>{members.length}</strong> members
 
       </div>
-
-      {memberFeedback && (
-        <div className={`member-feedback ${memberFeedback.type}`} role="status">
-          {memberFeedback.message}
-        </div>
-      )}
 
 
       {/* API error */}
@@ -310,7 +454,6 @@ function MembersPage() {
           branches={branches}
           onMemberUpdated={handleMemberUpdated}
           onMemberDeleted={handleMemberDeleted}
-          onFeedback={showMemberFeedback}
         />
 
       )}

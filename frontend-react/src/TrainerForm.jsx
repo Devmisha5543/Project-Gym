@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { trainerSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { Award, Mail, Phone, Plus, Save, UserRound } from 'lucide-react'
 
 function TrainerForm({ onTrainerCreated }) {
   const [name, setName] = useState('')
@@ -42,29 +43,63 @@ function TrainerForm({ onTrainerCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Name:</label>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} required />
-      {errors.name && <p style={{ color: '#dc2626' }}>{errors.name}</p>}
-      <br /><br />
+    <section className="trainer-form-section">
+      <div className="trainer-form-heading">
+        <div className="trainer-form-icon">
+          <Plus size={19} />
+        </div>
+        <div>
+          <h2>Add New Trainer</h2>
+          <p>Register a coach for your gym team.</p>
+        </div>
+      </div>
 
-      <label>Phone:</label>
-      <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required />
-      {errors.phone && <p style={{ color: '#dc2626' }}>{errors.phone}</p>}
-      <br /><br />
+      <form className="trainer-form" onSubmit={handleSubmit}>
+        <div className="trainer-form-grid">
+          <label className="trainer-field">
+            <span>Full name</span>
+            <div className="trainer-input-wrap">
+              <UserRound size={16} />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Enter trainer name" />
+            </div>
+            {errors.name && <small className="trainer-field-error">{errors.name}</small>}
+          </label>
 
-      <label>Email:</label>
-      <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-      {errors.email && <p style={{ color: '#dc2626' }}>{errors.email}</p>}
-      <br /><br />
+          <label className="trainer-field">
+            <span>Phone</span>
+            <div className="trainer-input-wrap">
+              <Phone size={16} />
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="Trainer phone number" />
+            </div>
+            {errors.phone && <small className="trainer-field-error">{errors.phone}</small>}
+          </label>
 
-      <label>Certificate:</label>
-      <input type="text" value={certification} onChange={e => setCertification(e.target.value)} required />
-      {errors.certification && <p style={{ color: '#dc2626' }}>{errors.certification}</p>}
-      <br /><br />
+          <label className="trainer-field">
+            <span>Email</span>
+            <div className="trainer-input-wrap">
+              <Mail size={16} />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="trainer@example.com" />
+            </div>
+            {errors.email && <small className="trainer-field-error">{errors.email}</small>}
+          </label>
 
-      <button type="submit">Add Trainer</button>
-    </form>
+          <label className="trainer-field">
+            <span>Certification</span>
+            <div className="trainer-input-wrap">
+              <Award size={16} />
+              <input type="text" value={certification} onChange={e => setCertification(e.target.value)} required placeholder="e.g. Strength & Conditioning" />
+            </div>
+            {errors.certification && <small className="trainer-field-error">{errors.certification}</small>}
+          </label>
+        </div>
+
+        <div className="trainer-form-actions">
+          <button type="submit" className="trainer-primary-button">
+            <Save size={16} /> Add Trainer
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

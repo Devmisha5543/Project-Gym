@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { trainerBranchSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { GitBranch, MapPin, Save, UserRound } from 'lucide-react'
 
 function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -53,29 +54,17 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Trainer:</label>
-      <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
+    <section className="trainer-branch-form-section"><div className="trainer-branch-form-heading"><div className="trainer-branch-form-icon"><GitBranch size={19} /></div><div><h2>Link Trainer to Branch</h2><p>Define where a trainer is available to coach.</p></div></div><form className="trainer-branch-form" onSubmit={handleSubmit}><div className="trainer-branch-form-grid"><label className="trainer-branch-field"><span>Trainer</span><div className="trainer-branch-input-wrap"><UserRound size={16} /><select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
         <option value="">-- Select a trainer --</option>
         {trainers.map(trainer => (
           <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
         ))}
-      </select>
-      {errors.trainerId && <p style={{ color: '#dc2626' }}>{errors.trainerId}</p>}
-      <br /><br />
-
-      <label>Branch:</label>
-      <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
+      </select></div>{errors.trainerId && <small className="trainer-branch-field-error">{errors.trainerId}</small>}</label><label className="trainer-branch-field"><span>Branch</span><div className="trainer-branch-input-wrap"><MapPin size={16} /><select value={branchId} onChange={e => setBranchId(e.target.value)} required>
         <option value="">-- Select a branch --</option>
         {branches.map(branch => (
           <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
         ))}
-      </select>
-      {errors.branchId && <p style={{ color: '#dc2626' }}>{errors.branchId}</p>}
-      <br /><br />
-
-      <button type="submit">Add Assignment</button>
-    </form>
+      </select></div>{errors.branchId && <small className="trainer-branch-field-error">{errors.branchId}</small>}</label></div><div className="trainer-branch-form-actions"><button type="submit" className="trainer-branch-primary-button"><Save size={16} /> Add Link</button></div></form></section>
   )
 }
 

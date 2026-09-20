@@ -34,6 +34,7 @@ CORS(app, origins=[
     "http://127.0.0.1:5173",
     "http://192.168.1.4:5173",
     "http://192.168.1.3:5173",
+    "http://192.168.1.7:5173",
     "https://project-gym-zeta.vercel.app"
 ])
 

@@ -23,6 +23,7 @@ import TrainerBranchPage from './TrainerBranchPage'
 import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
+import MobileNavigation from './MobileNavigation'
 
 
 const navigation = [
@@ -76,6 +77,9 @@ function ProtectedLayout() {
 
   return (
     <div className="app-layout">
+
+      {/* MOBILE NAVIGATION */}
+      <MobileNavigation onLogout={handleLogout} />
 
       {/* SIDEBAR */}
       <aside className="sidebar">

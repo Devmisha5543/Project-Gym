@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { classBookingSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { CalendarCheck, CalendarDays, Dumbbell, Save, UserRound } from 'lucide-react'
 
 function ClassBookingForm({ onClassBookingCreated }) {
   const [members, setMembers] = useState([])
@@ -59,43 +60,34 @@ function ClassBookingForm({ onClassBookingCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Member:</label>
-      <select value={memberId} onChange={e => setMemberId(e.target.value)} required>
+    <section className="class-booking-form-section"><div className="class-booking-form-heading"><div className="class-booking-form-icon"><CalendarCheck size={19} /></div><div><h2>Book a Class</h2><p>Reserve a place for a member in a scheduled class.</p></div></div><form className="class-booking-form" onSubmit={handleSubmit}>
+      <div className="class-booking-form-grid"><label className="class-booking-field"><span>Member</span><div className="class-booking-input-wrap"><UserRound size={16} /><select value={memberId} onChange={e => setMemberId(e.target.value)} required>
         <option value="">-- Select a member --</option>
         {members.map(member => (
           <option key={member.member_id} value={member.member_id}>{member.name}</option>
         ))}
-      </select>
-      {errors.memberId && <p style={{ color: '#dc2626' }}>{errors.memberId}</p>}
-      <br /><br />
+      </select></div>
+      {errors.memberId && <small className="class-booking-field-error">{errors.memberId}</small>}</label>
 
-      <label>Class:</label>
-      <select value={classId} onChange={e => setClassId(e.target.value)} required>
+      <label className="class-booking-field"><span>Class</span><div className="class-booking-input-wrap"><Dumbbell size={16} /><select value={classId} onChange={e => setClassId(e.target.value)} required>
         <option value="">-- Select a class --</option>
         {classes.map(gymClass => (
           <option key={gymClass.class_id} value={gymClass.class_id}>{gymClass.class_name} - {gymClass.schedule_time}</option>
         ))}
-      </select>
-      {errors.classId && <p style={{ color: '#dc2626' }}>{errors.classId}</p>}
-      <br /><br />
+      </select></div>
+      {errors.classId && <small className="class-booking-field-error">{errors.classId}</small>}</label>
 
-      <label>Booking_Date:</label>
-      <input type="datetime-local" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required />
-      {errors.bookingDate && <p style={{ color: '#dc2626' }}>{errors.bookingDate}</p>}
-      <br /><br />
+      <label className="class-booking-field"><span>Booking date</span><div className="class-booking-input-wrap"><CalendarDays size={16} /><input type="datetime-local" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required /></div>
+      {errors.bookingDate && <small className="class-booking-field-error">{errors.bookingDate}</small>}</label>
 
-      <label>Status:</label>
-      <select value={status} onChange={e => setStatus(e.target.value)} required>
+      <label className="class-booking-field"><span>Status</span><div className="class-booking-input-wrap"><CalendarCheck size={16} /><select value={status} onChange={e => setStatus(e.target.value)} required>
         <option value="">-- Select status --</option>
         <option value="booked">Booked</option>
         <option value="cancelled">Cancelled</option>
         <option value="completed">Completed</option>
-      </select>
-      <br /><br />
-
-      <button type="submit">Add Class Booking</button>
-    </form>
+      </select></div></label></div>
+      <div className="class-booking-form-actions"><button type="submit" className="class-booking-primary-button"><Save size={16} /> Add Booking</button></div>
+    </form></section>
   )
 }
 

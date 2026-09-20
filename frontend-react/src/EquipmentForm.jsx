@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { equipmentSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { Boxes, MapPin, Save, ShieldCheck } from 'lucide-react'
 
 function EquipmentForm({ onEquipmentCreated }) {
   const [branches, setBranches] = useState([])
@@ -54,33 +55,12 @@ function EquipmentForm({ onEquipmentCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Branch:</label>
-      <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
+    <section className="equipment-form-section"><div className="equipment-form-heading"><div className="equipment-form-icon"><Boxes size={19} /></div><div><h2>Add Equipment</h2><p>Register equipment and assign it to a branch.</p></div></div><form className="equipment-form" onSubmit={handleSubmit}><div className="equipment-form-grid"><label className="equipment-field"><span>Branch</span><div className="equipment-input-wrap"><MapPin size={16} /><select value={branchId} onChange={e => setBranchId(e.target.value)} required>
         <option value="">-- Select a branch</option>
         {branches.map(branch => (
           <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
         ))}
-      </select>
-      {errors.branchId && <p style={{ color: '#dc2626' }}>{errors.branchId}</p>}
-      <br /><br />
-
-      <label>Name:</label>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} required />
-      {errors.name && <p style={{ color: '#dc2626' }}>{errors.name}</p>}
-      <br /><br />
-
-      <label>Quantity:</label>
-      <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} required />
-      {errors.quantity && <p style={{ color: '#dc2626' }}>{errors.quantity}</p>}
-      <br /><br />
-
-      <label>Condition:</label>
-      <input type="text" value={condition} onChange={e => setCondition(e.target.value)} required />
-      <br /><br />
-
-      <button type="submit">Add Equipment</button>
-    </form>
+      </select></div>{errors.branchId && <small className="equipment-field-error">{errors.branchId}</small>}</label><label className="equipment-field"><span>Equipment name</span><div className="equipment-input-wrap"><Boxes size={16} /><input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Treadmill" /></div>{errors.name && <small className="equipment-field-error">{errors.name}</small>}</label><label className="equipment-field"><span>Quantity</span><div className="equipment-input-wrap"><Boxes size={16} /><input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} required placeholder="1" /></div>{errors.quantity && <small className="equipment-field-error">{errors.quantity}</small>}</label><label className="equipment-field"><span>Condition</span><div className="equipment-input-wrap"><ShieldCheck size={16} /><input type="text" value={condition} onChange={e => setCondition(e.target.value)} required placeholder="e.g. Good" /></div></label></div><div className="equipment-form-actions"><button type="submit" className="equipment-primary-button"><Save size={16} /> Add Equipment</button></div></form></section>
   )
 }
 

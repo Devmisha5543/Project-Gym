@@ -1,1 +1,1 @@
-export const API_URL = "https://project-gym-qre9.onrender.com"
+export const API_URL = `http://${window.location.hostname}:5000`

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { adminSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { Mail, Phone, Save, ShieldCheck, UserRound } from 'lucide-react'
 
 function AdminForm({ onAdminCreated }) {
   const [name, setName] = useState('')
@@ -40,24 +41,7 @@ function AdminForm({ onAdminCreated }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>Name:</label>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} required />
-      {errors.name && <p style={{ color: '#dc2626' }}>{errors.name}</p>}
-      <br /><br />
-
-      <label>Email:</label>
-      <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
-      {errors.email && <p style={{ color: '#dc2626' }}>{errors.email}</p>}
-      <br /><br />
-
-      <label>Phone:</label>
-      <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required />
-      {errors.phone && <p style={{ color: '#dc2626' }}>{errors.phone}</p>}
-      <br /><br />
-
-      <button type="submit">Add Admin</button>
-    </form>
+    <section className="admin-form-section"><div className="admin-form-heading"><div className="admin-form-icon"><ShieldCheck size={19} /></div><div><h2>Add Administrator</h2><p>Create an admin account with secure credentials.</p></div></div><form className="admin-form" onSubmit={handleSubmit}><div className="admin-form-grid"><label className="admin-field"><span>Name</span><div className="admin-input-wrap"><UserRound size={16} /><input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Full name" /></div>{errors.name && <small className="admin-field-error">{errors.name}</small>}</label><label className="admin-field"><span>Email</span><div className="admin-input-wrap"><Mail size={16} /><input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="admin@example.com" /></div>{errors.email && <small className="admin-field-error">{errors.email}</small>}</label><label className="admin-field"><span>Phone</span><div className="admin-input-wrap"><Phone size={16} /><input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="Phone number" /></div>{errors.phone && <small className="admin-field-error">{errors.phone}</small>}</label></div><div className="admin-form-actions"><button type="submit" className="admin-primary-button"><Save size={16} /> Add Admin</button></div></form></section>
   )
 }
 
