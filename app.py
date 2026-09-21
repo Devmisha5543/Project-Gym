@@ -56,11 +56,146 @@ def token_required(f):
         except jwt.InvalidTokenError:
             return jsonify({"error": "Invalid token"}), 401
 
+        request.decoded_token = decoded
         return f(*args, **kwargs)
 
     return decorated
 
+def get_authenticated_gym_id(conn=None):
+    decoded = getattr(request, "decoded_token", None)
+    if not decoded:
+        return None
+
+    # Forward-compatible: use gym_id if present in token payload
+    if "gym_id" in decoded and decoded["gym_id"] is not None:
+        return decoded["gym_id"]
+
+    admin_id = decoded.get("admin_id")
+    if not admin_id:
+        return None
+
+    should_close = False
+    if conn is None:
+        conn = get_db_connection()
+        should_close = True
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT gym_id FROM Admin WHERE admin_id = %s;", (admin_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if row and row[0] is not None:
+            return row[0]
+        return None
+    finally:
+        if should_close:
+            conn.close()
+
 REQUEST_BODY_JSON_ERROR = "Request body must be valid JSON"
+
+@app.route("/gym", methods=["GET"])
+@token_required
+def get_gym():
+    try:
+        conn = get_db_connection()
+        gym_id = get_authenticated_gym_id(conn)
+        if not gym_id:
+            conn.close()
+            return jsonify({"error": "Gym not found"}), 404
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT gym_id, name, phone, email, address, currency, logo_url, created_at FROM gym WHERE gym_id = %s;",
+            (gym_id,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            return jsonify({"error": "Gym not found"}), 404
+
+        return jsonify({
+            "gym_id": row[0],
+            "name": row[1],
+            "phone": row[2],
+            "email": row[3],
+            "address": row[4],
+            "currency": row[5],
+            "logo_url": row[6],
+            "created_at": row[7].isoformat() if row[7] else None
+        }), 200
+    except Exception as e:
+        return jsonify({"error": "Failed to retrieve gym details"}), 500
+
+@app.route("/gym", methods=["PUT"])
+@token_required
+def update_gym():
+    data = request.json
+
+    if not data:
+        return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
+
+    if "name" in data and (data["name"] is None or not str(data["name"]).strip()):
+        return jsonify({"error": "Gym name cannot be empty"}), 400
+
+    try:
+        conn = get_db_connection()
+        gym_id = get_authenticated_gym_id(conn)
+        if not gym_id:
+            conn.close()
+            return jsonify({"error": "Gym not found"}), 404
+
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT gym_id, name, phone, email, address, currency, logo_url, created_at FROM gym WHERE gym_id = %s;",
+            (gym_id,)
+        )
+        existing = cursor.fetchone()
+        if not existing:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Gym not found"}), 404
+
+        name = data.get("name", existing[1])
+        phone = data.get("phone", existing[2])
+        email = data.get("email", existing[3])
+        address = data.get("address", existing[4])
+        currency = data.get("currency", existing[5])
+        logo_url = data.get("logo_url", existing[6])
+
+        cursor.execute(
+            """
+            UPDATE gym
+            SET name = %s, phone = %s, email = %s, address = %s, currency = %s, logo_url = %s
+            WHERE gym_id = %s
+            RETURNING gym_id, name, phone, email, address, currency, logo_url, created_at;
+            """,
+            (name, phone, email, address, currency, logo_url, gym_id)
+        )
+        updated = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        gym_data = {
+            "gym_id": updated[0],
+            "name": updated[1],
+            "phone": updated[2],
+            "email": updated[3],
+            "address": updated[4],
+            "currency": updated[5],
+            "logo_url": updated[6],
+            "created_at": updated[7].isoformat() if updated[7] else None
+        }
+
+        return jsonify({
+            "message": "Gym updated successfully",
+            "gym": gym_data,
+            **gym_data
+        }), 200
+    except Exception as e:
+        return jsonify({"error": "Failed to update gym details"}), 500
 
 @app.route("/uploads/<filename>")
 def get_uploaded_file(filename):
@@ -1218,7 +1353,7 @@ def login():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT admin_id, name, password_hash FROM Admin WHERE email = %s;", (data["email"],))
+    cursor.execute("SELECT admin_id, name, password_hash, gym_id FROM Admin WHERE email = %s;", (data["email"],))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -1226,7 +1361,7 @@ def login():
     if row is None:
         return jsonify({"error": "Invalid email or password"}), 401
 
-    admin_id, name, password_hash = row
+    admin_id, name, password_hash, gym_id = row
 
     if not check_password_hash(password_hash, data["password"]):
         return jsonify({"error": "Invalid email or password"}), 401
@@ -1235,13 +1370,14 @@ def login():
         {
             "admin_id": admin_id,
             "role": "admin",
+            "gym_id": gym_id,
             "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
         },
         os.getenv("JWT_SECRET"),
         algorithm="HS256"
     )
 
-    return jsonify({"message": "Login successful", "token": token, "name": name}), 200
+    return jsonify({"message": "Login successful", "token": token, "name": name, "gym_id": gym_id}), 200
 
 
 if __name__ == "__main__":
