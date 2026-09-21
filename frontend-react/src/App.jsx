@@ -24,6 +24,8 @@ import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
 import MobileNavigation from './MobileNavigation'
+import SettingsPage from './SettingsPage'
+import { GymProvider, useGym, GymBrandMark } from './GymContext'
 
 
 const navigation = [
@@ -61,6 +63,7 @@ const navigation = [
     title: 'System',
     items: [
       { path: '/admins', label: 'Admins' },
+      { path: '/settings', label: 'Settings' },
     ],
   },
 ]
@@ -69,11 +72,14 @@ const navigation = [
 function ProtectedLayout() {
 
   const navigate = useNavigate()
+  const { gym, loading: gymLoading } = useGym()
 
   function handleLogout() {
     localStorage.removeItem('token')
     navigate('/login')
   }
+
+  const gymName = gym?.name || 'Project Gym'
 
   return (
     <div className="app-layout">
@@ -87,12 +93,10 @@ function ProtectedLayout() {
         {/* BRAND */}
         <div className="sidebar-brand">
 
-          <div className="brand-mark">
-            PG
-          </div>
+          <GymBrandMark logoUrl={gym?.logo_url} name={gymName} />
 
           <div className="brand-text">
-            <h2>Project Gym</h2>
+            <h2>{gymLoading ? 'Loading...' : gymName}</h2>
             <span>Management</span>
           </div>
 
@@ -187,7 +191,11 @@ function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  return <ProtectedLayout />
+  return (
+    <GymProvider>
+      <ProtectedLayout />
+    </GymProvider>
+  )
 }
 
 
@@ -283,6 +291,11 @@ function App() {
         <Route
           path="/admins"
           element={<AdminPage />}
+        />
+
+        <Route
+          path="/settings"
+          element={<SettingsPage />}
         />
 
       </Route>

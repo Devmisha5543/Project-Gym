@@ -15,8 +15,10 @@ import {
   Layers,
   GitBranch,
   Shield,
+  Settings,
   LogOut,
 } from 'lucide-react'
+import { useGym, GymBrandMark } from './GymContext'
 
 const primaryNav = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -39,6 +41,7 @@ const moreRoutes = [
   { path: '/equipment', label: 'Equipment', icon: Layers },
   { path: '/trainerbranch', label: 'Trainer Branch', icon: GitBranch },
   { path: '/admins', label: 'Admin', icon: Shield },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function subscribeToMedia(callback) {
@@ -64,6 +67,7 @@ export default function MobileNavigation({ onLogout }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const [prevPathname, setPrevPathname] = useState('')
   const location = useLocation()
+  const { gym, loading: gymLoading } = useGym()
 
   // Close "More" menu when route changes during render
   if (prevPathname !== location.pathname) {
@@ -93,14 +97,16 @@ export default function MobileNavigation({ onLogout }) {
     (route) => location.pathname === route.path
   )
 
+  const gymName = gym?.name || 'Project Gym'
+
   return (
     <>
       {/* MOBILE HEADER */}
       <header className="mobile-header">
         <div className="mobile-header-brand">
-          <div className="brand-mark">PG</div>
+          <GymBrandMark logoUrl={gym?.logo_url} name={gymName} />
           <div className="brand-text">
-            <h2>Project Gym</h2>
+            <h2>{gymLoading ? 'Loading...' : gymName}</h2>
             <span>Management</span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
+import { useGym } from './GymContext'
 import MemberDetail from './MemberDetail'
 import {
   Activity,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 
 function DashboardPage() {
+  const { gym, loading: gymLoading } = useGym()
   const [expiring, setExpiring] = useState([])
   const [memberCount, setMemberCount] = useState(0)
   const [classCount, setClassCount] = useState(0)
@@ -81,7 +83,7 @@ function DashboardPage() {
           </h1>
 
           <p className="dashboard-subtitle">
-            Here's what's happening with your gym today.
+            Here's what's happening with {gymLoading ? 'your gym' : (gym?.name || 'your gym')} today.
           </p>
         </div>
 
