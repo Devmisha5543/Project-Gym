@@ -205,6 +205,32 @@ def get_uploaded_file(filename):
 def home():
     return "Gym Management System backend is running!"
 
+@app.route("/db-check", methods=["GET"])
+def db_check():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT current_database(), current_schema();")
+    db_name, schema = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'admin'
+          AND column_name = 'gym_id';
+    """)
+    gym_column = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "database": db_name,
+        "schema": schema,
+        "admin_has_gym_id": gym_column is not None
+    })
+
 @app.route("/branches")
 def get_branches():
     conn = get_db_connection()
