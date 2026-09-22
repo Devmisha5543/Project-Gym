@@ -79,7 +79,7 @@ function DashboardPage() {
           </p>
 
           <h1>
-            Overview of your gym's activity and performance.
+            View of your gym's activity and performance.
           </h1>
 
           <p className="dashboard-subtitle">
