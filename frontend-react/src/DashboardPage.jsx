@@ -79,11 +79,11 @@ function DashboardPage() {
           </p>
 
           <h1>
-            Good morning, Admin
+            Overview of your gym's activity and performance.
           </h1>
 
           <p className="dashboard-subtitle">
-            Here's what's happening with {gymLoading ? 'your gym' : (gym?.name || 'your gym')} today.
+            Gym operations at a glance.
           </p>
         </div>
 
@@ -158,9 +158,12 @@ function DashboardPage() {
           <div className="stat-number">
             {loading
               ? '—'
-              : `$${totalRevenue.toFixed(2)}`
+              : new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: gym?.currency || 'ETB',
+                }).format(totalRevenue)
             }
-          </div>
+         </div>
 
           <p className="stat-description">
             Total recorded payments

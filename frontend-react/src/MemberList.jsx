@@ -32,6 +32,22 @@ function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFee
       (member.branch_id ? `Branch ${member.branch_id}` : '—')
     )
   }
+ function formatDate(value) {
+   if (!value) return '—'
+
+   const date = new Date(value)
+
+   if (Number.isNaN(date.getTime())) {
+
+    return value
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
 
   return (
     <>
@@ -82,7 +98,7 @@ function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFee
                 <td className="td-phone">{member.phone || '—'}</td>
                 <td className="td-branch">{getBranchName(member)}</td>
                 <td className="td-address">{member.address || '—'}</td>
-                <td className="td-joined">{member.join_date || '—'}</td>
+                <td className="td-joined">{formatDate(member.join_date)}</td>
                 <td className="td-trainer">{member.wants_trainer ? 'Yes' : 'No'}</td>
                 <td className="td-status">
                   <span className="member-status-badge">Active</span>

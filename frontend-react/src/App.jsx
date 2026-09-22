@@ -96,9 +96,9 @@ function ProtectedLayout() {
           <GymBrandMark logoUrl={gym?.logo_url} name={gymName} />
 
           <div className="brand-text">
-            <h2>{gymLoading ? 'Loading...' : gymName}</h2>
-            <span>Management</span>
-          </div>
+           <h2>{gymLoading ? 'Loading...' : gymName}</h2>
+           <span>Gym Management</span>
+         </div>
 
         </div>
 
