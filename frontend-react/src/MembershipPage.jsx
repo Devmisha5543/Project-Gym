@@ -69,7 +69,11 @@ function MembershipPage() {
           <p>Getting membership information ready.</p>
         </div>
       ) : (
-        <MembershipList memberships={memberships} />
+        <MembershipList 
+          memberships={memberships}
+          onMembershipUpdated={loadMemberships}
+          onMembershipDeleted={loadMemberships}
+         />
       )}
     </div>
   )

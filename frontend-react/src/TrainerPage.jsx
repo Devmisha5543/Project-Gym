@@ -69,7 +69,11 @@ function TrainerPage() {
           <p>Getting your coaching team ready.</p>
         </div>
       ) : (
-        <TrainerList trainers={trainers} />
+        <TrainerList
+          trainers={trainers}
+          onTrainerUpdated={loadTrainers}
+          onTrainerDeleted={loadTrainers}
+       />
       )}
     </div>
   )

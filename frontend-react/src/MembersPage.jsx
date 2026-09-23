@@ -2,7 +2,7 @@ import { useState, useEffect, useSyncExternalStore } from 'react'
 import { API_URL } from './config'
 import MemberList from './MemberList'
 import MemberForm from './MemberForm'
-import { Search, Users, Building2, Filter, X } from 'lucide-react'
+import { Search, Users, Building2, Filter, X, AlertCircle, RotateCcw } from 'lucide-react'
 
 function subscribeToMobile(callback) {
   const mql = window.matchMedia('(max-width: 768px)')
@@ -427,11 +427,27 @@ function MembersPage() {
 
 
       {/* API error */}
-      {pageError && (
-        <div className="form-error">
-          {pageError}
-        </div>
-      )}
+      ]{pageError && (
+  <div className="member-error-state">
+    <div className="member-error-icon">
+      <AlertCircle size={20} />
+    </div>
+
+    <div className="member-error-content">
+      <strong>Something went wrong</strong>
+      <span>{pageError}</span>
+    </div>
+
+    <button
+      type="button"
+      className="member-error-retry"
+      onClick={loadMembers}
+    >
+      <RotateCcw size={15} />
+      Retry
+    </button>
+  </div>
+)}
 
 
       {/* Members */}

@@ -69,7 +69,11 @@ function ClassPage() {
           <p>Getting your class schedule ready.</p>
         </div>
       ) : (
-        <ClassList classes={classes} />
+        <ClassList 
+        classes={classes}
+        onClassUpdated={loadClasses}
+        onClassDeleted={loadClasses} 
+        />
       )}
     </div>
   )

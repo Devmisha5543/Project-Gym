@@ -281,23 +281,45 @@ def create_branch():
 @app.route("/branches/<int:branch_id>", methods=["DELETE"])
 @token_required
 def delete_branch(branch_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    conn=get_db_connection()
+    try:
+        cursor.execute(
+            "DELETE FROM Branch WHERE branch_id = %s;",
+            (branch_id,)
+        )
 
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM Branch WHERE branch_id = %s;", (branch_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({
+                "error": f"Branch {branch_id} not found"
+            }), 404
 
-    if cursor.rowcount == 0:
+        conn.commit()
+
+        return jsonify({
+            "message": f"Branch {branch_id} deleted"
+        }), 200
+
+    except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
+
+        return jsonify({
+            "error": "This branch cannot be deleted because it is still being used by other records, such as classes."
+        }), 409
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Failed to delete branch {branch_id}: {e}")
+
+        return jsonify({
+            "error": "Failed to delete branch."
+        }), 500
+
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Branch {branch_id} not found"}), 404
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    return jsonify({"message": f"Branch {branch_id} deleted"}), 200
 
 @app.route("/branches/<int:branch_id>", methods=["PUT"])
 @token_required
@@ -479,7 +501,11 @@ def get_trainers():
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("SELECT trainer_id, name, phone, email, certification FROM trainer;")
+    cursor.execute("""
+    SELECT trainer_id, name, phone, email, certification
+    FROM trainer
+    ORDER BY trainer_id ASC;
+    """)
     rows = cursor.fetchall()
     cursor.close()
     conn.close()

@@ -16,7 +16,9 @@ function PaymentPage() {
     fetch(`${API_URL}/payments`)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Payments request failed: ${response.status}`)
+          throw new Error(
+            `Payments request failed: ${response.status}`
+          )
         }
 
         return response.json()
@@ -24,23 +26,34 @@ function PaymentPage() {
       .then(data => setPayments(data))
       .catch(error => {
         console.error('Failed to load payments:', error)
+
         setPayments([])
-        setPageError('Unable to load payments. Please try again.')
+
+        setPageError(
+          'Unable to load payments. Please try again.'
+        )
       })
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
     const loadTimer = setTimeout(loadPayments, 0)
+
     return () => clearTimeout(loadTimer)
   }, [])
 
   return (
     <div className="page-container payments-page">
+
       <div className="page-header">
+
         <div>
-          <p className="page-eyebrow">GYM MANAGEMENT</p>
+          <p className="page-eyebrow">
+            GYM MANAGEMENT
+          </p>
+
           <h1>Payments</h1>
+
           <p className="page-description">
             Record and review membership payments across your gym.
           </p>
@@ -48,12 +61,21 @@ function PaymentPage() {
 
         <div className="payment-total">
           <CreditCard size={19} />
-          <span>{payments.length}</span>
-          <small>Total Payments</small>
+
+          <span>
+            {payments.length}
+          </span>
+
+          <small>
+            Total Payments
+          </small>
         </div>
+
       </div>
 
-      <PaymentForm onPaymentCreated={loadPayments} />
+      <PaymentForm
+        onPaymentCreated={loadPayments}
+      />
 
       {pageError && (
         <div className="payment-feedback">
@@ -63,14 +85,31 @@ function PaymentPage() {
       )}
 
       {loading ? (
+
         <div className="payment-state">
+
           <div className="loading-spinner"></div>
-          <h3>Loading payments</h3>
-          <p>Getting your transaction history ready.</p>
+
+          <h3>
+            Loading payments
+          </h3>
+
+          <p>
+            Getting your transaction history ready.
+          </p>
+
         </div>
+
       ) : (
-        <PaymentList payments={payments} />
+
+        <PaymentList
+          payments={payments}
+          onPaymentUpdated={loadPayments}
+          onPaymentDeleted={loadPayments}
+        />
+
       )}
+
     </div>
   )
 }

@@ -69,7 +69,11 @@ function MembershipPlanPage() {
           <p>Getting your plan catalogue ready.</p>
         </div>
       ) : (
-        <MembershipPlanList membershipPlans={membershipPlans} />
+        <MembershipPlanList 
+          membershipPlans={membershipPlans}
+          onPlanUpdated={loadMembershipPlans}
+          onPlanDeleted={loadMembershipPlans}
+        />
       )}
     </div>
   )

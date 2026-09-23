@@ -61,18 +61,23 @@ function BranchPage() {
           <span>{pageError}</span>
         </div>
       )}
-
-      {loading ? (
+            {loading ? (
         <div className="branch-state">
           <div className="loading-spinner"></div>
           <h3>Loading branches</h3>
           <p>Getting your gym locations ready.</p>
         </div>
       ) : (
-        <BranchList branches={branches} />
+        <BranchList
+          branches={branches}
+          onBranchUpdated={loadBranches}
+          onBranchDeleted={loadBranches}
+        />
       )}
     </div>
   )
 }
 
 export default BranchPage
+
+    
