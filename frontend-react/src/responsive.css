@@ -2918,6 +2918,16 @@ html[data-theme="light"] .equipment-quantity {
   color: #6d28d9;
 }
 
+html[data-theme="light"] .quick-action strong,
+html[data-theme="light"] .add-member-header {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .quick-action div span,
+html[data-theme="light"] .add-member-title span {
+  color: var(--text-secondary);
+}
+
 @media (max-width: 768px) {
   html[data-theme="light"] .mobile-header,
   html[data-theme="light"] .mobile-bottom-nav {
