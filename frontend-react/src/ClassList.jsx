@@ -30,16 +30,17 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [operationError, setOperationError] = useState('')
 
   useEffect(() => {
-    fetch(`${API_URL}/branches`)
+    authFetch(`${API_URL}/branches`)
       .then(response => response.json())
       .then(data => setBranches(data))
       .catch(error => {
         console.error('Failed to load branches:', error)
       })
 
-    fetch(`${API_URL}/trainers`)
+    authFetch(`${API_URL}/trainers`)
       .then(response => response.json())
       .then(data => setTrainers(data))
       .catch(error => {
@@ -66,6 +67,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
   }
 
   function handleEdit(gymClass) {
+    setOperationError('')
     setEditingClass(gymClass)
 
     setFormData({
@@ -104,6 +106,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
     event.preventDefault()
 
     setSaving(true)
+    setOperationError('')
 
     authFetch(`${API_URL}/classes/${editingClass.class_id}`, {
       method: 'PUT',
@@ -125,7 +128,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update class:', error)
-        alert('Unable to update class. Please try again.')
+        setOperationError('Unable to update class. Please try again.')
       })
       .finally(() => {
         setSaving(false)
@@ -140,6 +143,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
     if (!confirmed) return
 
     setDeletingId(classId)
+    setOperationError('')
 
     authFetch(`${API_URL}/classes/${classId}`, {
       method: 'DELETE'
@@ -156,7 +160,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .catch(error => {
         console.error('Failed to delete class:', error)
-        alert('Unable to delete class. Please try again.')
+        setOperationError('Unable to delete class. Please try again.')
       })
       .finally(() => {
         setDeletingId(null)
@@ -178,6 +182,12 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
   return (
     <>
+      {operationError && (
+        <div className="class-feedback" role="alert">
+          {operationError}
+        </div>
+      )}
+
       <div className="class-list">
         {classes.map(gymClass => (
           <article className="class-card" key={gymClass.class_id}>

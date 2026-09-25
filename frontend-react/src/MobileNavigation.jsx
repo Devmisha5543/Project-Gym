@@ -17,8 +17,12 @@ import {
   Shield,
   Settings,
   LogOut,
+  Moon,
+  Sun,
 } from 'lucide-react'
 import { useGym, GymBrandMark } from './GymContext'
+import { useTheme } from './ThemeContext'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
 const primaryNav = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -68,6 +72,9 @@ export default function MobileNavigation({ onLogout }) {
   const [prevPathname, setPrevPathname] = useState('')
   const location = useLocation()
   const { gym, loading: gymLoading } = useGym()
+  const { theme, toggleTheme } = useTheme()
+  const reduceMotion = useReducedMotion()
+  const menuTransition = { duration: reduceMotion ? 0 : 0.2, ease: 'easeOut' }
 
   // Close "More" menu when route changes during render
   if (prevPathname !== location.pathname) {
@@ -156,19 +163,35 @@ export default function MobileNavigation({ onLogout }) {
       </nav>
 
       {/* "MORE" MOBILE MENU SHEET */}
-      {moreOpen && (
-        <>
-          <div
-            className="mobile-more-overlay"
-            onClick={() => setMoreOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            className="mobile-more-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label="More navigation menu"
+      <AnimatePresence>
+        {moreOpen && (
+          <motion.div
+            className="mobile-more-layer"
+            key="mobile-more-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={menuTransition}
           >
+            <motion.div
+              className="mobile-more-overlay"
+              onClick={() => setMoreOpen(false)}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={menuTransition}
+            />
+            <motion.div
+              className="mobile-more-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-label="More navigation menu"
+              initial={{ y: reduceMotion ? 0 : '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: reduceMotion ? 0 : '100%' }}
+              transition={menuTransition}
+            >
             <div className="mobile-sheet-drag-handle" />
 
             <div className="mobile-sheet-header">
@@ -203,6 +226,20 @@ export default function MobileNavigation({ onLogout }) {
 
               <button
                 type="button"
+                className="mobile-sheet-item mobile-sheet-theme"
+                onClick={toggleTheme}
+                aria-pressed={theme === 'light'}
+              >
+                {theme === 'dark'
+                  ? <Sun size={18} className="mobile-sheet-icon" />
+                  : <Moon size={18} className="mobile-sheet-icon" />}
+                <span className="mobile-sheet-label">
+                  {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                </span>
+              </button>
+
+              <button
+                type="button"
                 className="mobile-sheet-item mobile-sheet-logout"
                 onClick={() => {
                   setMoreOpen(false)
@@ -215,9 +252,10 @@ export default function MobileNavigation({ onLogout }) {
                 <span className="mobile-sheet-label">Logout</span>
               </button>
             </div>
-          </div>
-        </>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   )
 }

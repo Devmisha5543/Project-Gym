@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { memberSchema } from './schemas'
+import MemberPhoto from './MemberPhoto'
 
 function MemberDetail({
   member,
@@ -280,16 +281,6 @@ function toDateInputValue(value) {
 
   const parsedDate = new Date(valueText)
   return Number.isNaN(parsedDate.getTime()) ? '' : parsedDate.toISOString().slice(0, 10)
-}
-
-function MemberPhoto({ member, photoUrl, alt }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!photoUrl || failed) {
-    return <span>{member.name?.charAt(0).toUpperCase()}</span>
-  }
-
-  return <img src={photoUrl} alt={alt} onError={() => setFailed(true)} />
 }
 
 export default MemberDetail

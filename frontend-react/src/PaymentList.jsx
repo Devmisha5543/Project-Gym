@@ -23,9 +23,10 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [operationError, setOperationError] = useState('')
 
   useEffect(() => {
-    fetch(`${API_URL}/memberships`)
+    authFetch(`${API_URL}/memberships`)
       .then(response => response.json())
       .then(data => setMemberships(data))
       .catch(error => {
@@ -34,6 +35,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
   }, [])
 
   function startEditing(payment) {
+    setOperationError('')
     setEditingId(payment.payment_id)
     setEditMembershipId(String(payment.membership_id))
     setEditAmount(payment.amount)
@@ -66,6 +68,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   function handleUpdate(paymentId) {
     setSaving(true)
+    setOperationError('')
 
     const updatedPayment = {
       membership_id: editMembershipId,
@@ -94,6 +97,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update payment:', error)
+        setOperationError('Unable to update payment. Please try again.')
       })
       .finally(() => {
         setSaving(false)
@@ -108,6 +112,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
     if (!confirmed) return
 
     setDeletingId(paymentId)
+    setOperationError('')
 
     authFetch(`${API_URL}/payments/${paymentId}`, {
       method: 'DELETE'
@@ -124,6 +129,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .catch(error => {
         console.error('Failed to delete payment:', error)
+        setOperationError('Unable to delete payment. Please try again.')
       })
       .finally(() => {
         setDeletingId(null)
@@ -148,6 +154,12 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   return (
     <div className="payment-list">
+      {operationError && (
+        <div className="payment-feedback" role="alert">
+          {operationError}
+        </div>
+      )}
+
       {payments.map(payment => (
         <article
           className="payment-card"

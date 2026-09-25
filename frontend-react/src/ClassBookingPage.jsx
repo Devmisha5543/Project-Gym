@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import ClassBookingList from './ClassBookingList'
@@ -12,7 +13,7 @@ function ClassBookingPage() {
   function loadClassBookings() {
     setLoading(true)
     setPageError('')
-    fetch(`${API_URL}/classbookings`)
+    authFetch(`${API_URL}/classbookings`)
       .then(response => {
         if (!response.ok) throw new Error(`Bookings request failed: ${response.status}`)
         return response.json()

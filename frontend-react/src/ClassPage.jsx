@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import ClassList from './ClassList'
@@ -13,7 +14,7 @@ function ClassPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/classes`)
+    authFetch(`${API_URL}/classes`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Classes request failed: ${response.status}`)

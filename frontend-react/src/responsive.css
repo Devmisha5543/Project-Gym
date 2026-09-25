@@ -179,13 +179,20 @@
   /* =========================================
      MOBILE "MORE" MENU DRAWER
      ========================================= */
+  .mobile-more-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    pointer-events: none;
+  }
+
   .mobile-more-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(4px);
     z-index: 400;
-    animation: mobileFadeIn 0.2s ease-out;
+    pointer-events: auto;
   }
 
   .mobile-more-sheet {
@@ -198,12 +205,12 @@
     border-top: 1px solid #242424;
     border-radius: 18px 18px 0 0;
     z-index: 401;
+    pointer-events: auto;
     display: flex;
     flex-direction: column;
     padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0));
     box-shadow: 0 -10px 32px rgba(0, 0, 0, 0.8);
     box-sizing: border-box;
-    animation: mobileSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .mobile-sheet-drag-handle {
@@ -1795,22 +1802,17 @@
   }
 
   .plan-card {
-    display: grid;
-    grid-template-columns: 36px 1fr auto;
-    grid-template-rows: auto auto;
-    column-gap: 12px;
-    row-gap: 4px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     min-height: auto;
     padding: 12px 14px;
-    gap: 0;
+    gap: 10px;
     border-radius: 10px;
     box-sizing: border-box;
   }
 
   .plan-card-topline {
-    grid-column: 1;
-    grid-row: 1 / span 2;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1833,8 +1835,6 @@
   }
 
   .plan-card h2 {
-    grid-column: 2;
-    grid-row: 1;
     margin: 0;
     font-size: 14px;
     line-height: 1.25;
@@ -1844,13 +1844,11 @@
   }
 
   .plan-price {
-    grid-column: 3;
-    grid-row: 1;
     margin: 0;
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    justify-self: end;
+    align-self: flex-start;
   }
 
   .plan-price svg {
@@ -1864,8 +1862,6 @@
   }
 
   .plan-perks {
-    grid-column: 2 / span 2;
-    grid-row: 2;
     margin: 0;
     display: flex;
     align-items: center;
@@ -1924,8 +1920,13 @@
   }
 
   .memberships-page .page-header > div:first-child {
-    flex: 1;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
+  }
+
+  .memberships-page .page-header > .membership-total {
+    width: auto;
   }
 
   .memberships-page .page-eyebrow {
@@ -2000,6 +2001,7 @@
     flex-direction: row;
     align-items: flex-start;
     min-height: auto;
+    width: 100%;
     padding: 12px 14px;
     gap: 12px;
     border-radius: 10px;
@@ -2019,7 +2021,8 @@
   }
 
   .membership-card-main {
-    flex: 1;
+    width: 0;
+    flex: 1 1 0%;
     min-width: 0;
   }
 
@@ -2238,6 +2241,692 @@
     border-radius: 8px;
     justify-content: center;
     box-sizing: border-box;
+  }
+}
+
+html[data-theme="light"] .feedback-message--success {
+  border-color: #abefc6;
+  background: #ecfdf3;
+  color: #067647;
+}
+
+html[data-theme="light"] .feedback-message--error {
+  border-color: #fecdca;
+  background: #fff1f0;
+  color: #b42318;
+}
+
+@media (max-width: 480px) {
+  .main-content {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .page-container {
+    width: 100%;
+    min-width: 0;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .page-container .page-header {
+    width: 100%;
+    min-width: 0;
+    padding: 16px 12px;
+  }
+
+  .page-container .page-header > div,
+  .page-container .page-header h1,
+  .page-container .page-header .page-description {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: normal;
+  }
+
+  .branches-page .page-header > div,
+  .trainers-page .page-header > div,
+  .membership-plans-page .page-header > div:first-child,
+  .memberships-page .page-header > div:first-child {
+    width: auto;
+    flex: 1 1 0%;
+  }
+
+  .branches-page .page-header > div:not(:first-child),
+  .trainers-page .page-header > div:not(:first-child),
+  .membership-plans-page .page-header > .plan-total,
+  .memberships-page .page-header > .membership-total {
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .membership-plans-page .plan-card,
+  .memberships-page .membership-card {
+    width: 100%;
+  }
+
+  .membership-plans-page .plan-card h2,
+  .memberships-page .membership-card h2 {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .page-container [class$="-card"],
+  .page-container [class$="-form-section"],
+  .page-container [class$="-list"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-container [class$="-card"] h2 {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .page-container [class$="-form-actions"],
+  .page-container [class$="-card-actions"] {
+    flex-wrap: wrap;
+  }
+
+  .page-container [class$="-primary-button"],
+  .page-container [class$="-secondary-button"],
+  .page-container [class$="-danger-button"] {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 42px;
+  }
+
+  .dashboard .dashboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard .dashboard-header h1,
+  .dashboard .dashboard-subtitle {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .dashboard .refresh-button {
+    align-self: flex-start;
+  }
+
+  .member-detail-modal-panel {
+    width: 100%;
+    max-width: 100%;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .feedback-message {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .mobile-header {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .mobile-header-brand {
+    min-width: 0;
+    gap: 7px;
+  }
+
+  .mobile-header .brand-text {
+    min-width: 0;
+  }
+
+  .mobile-header .brand-text h2 {
+    max-width: 145px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-header-profile {
+    flex-shrink: 0;
+  }
+
+  .dashboard .dashboard-stats {
+    gap: 8px;
+  }
+
+  .dashboard-stat-card {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+}
+
+/* Shared theme controls */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  width: 100%;
+  min-height: 38px;
+  margin-bottom: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theme-toggle:hover,
+.mobile-sheet-theme:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.theme-toggle:focus-visible,
+.mobile-sheet-theme:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+/* Light theme surfaces and controls. Existing dark styles remain the default. */
+html[data-theme="light"] body,
+html[data-theme="light"] .app-layout,
+html[data-theme="light"] .main-content,
+html[data-theme="light"] .page-container,
+html[data-theme="light"] .dashboard,
+html[data-theme="light"] .login-page {
+  background: var(--page-bg);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .mobile-header,
+html[data-theme="light"] .mobile-bottom-nav,
+html[data-theme="light"] .mobile-more-sheet,
+html[data-theme="light"] .mobile-filter-sheet,
+html[data-theme="light"] .page-header,
+html[data-theme="light"] .dashboard-header,
+html[data-theme="light"] .dashboard-stat-card,
+html[data-theme="light"] .quick-action,
+html[data-theme="light"] .member-detail-modal-panel,
+html[data-theme="light"] .class-edit-modal,
+html[data-theme="light"] .login-card,
+html[data-theme="light"] .admin-profile,
+html[data-theme="light"] .search-box,
+html[data-theme="light"] .filter-box,
+html[data-theme="light"] .search-bar,
+html[data-theme="light"] .mobile-filter-select-wrap {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] [class$="-form-section"],
+html[data-theme="light"] [class$="-card"],
+html[data-theme="light"] [class$="-state"] {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] .sidebar-brand,
+html[data-theme="light"] .sidebar-footer,
+html[data-theme="light"] .mobile-sheet-header,
+html[data-theme="light"] .class-edit-actions,
+html[data-theme="light"] .class-booking-form-actions,
+html[data-theme="light"] .equipment-form-actions,
+html[data-theme="light"] .trainer-branch-form-actions,
+html[data-theme="light"] .admin-form-actions {
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .nav-section-title,
+html[data-theme="light"] .nav-link,
+html[data-theme="light"] .brand-text span,
+html[data-theme="light"] .admin-info span,
+html[data-theme="light"] .logout-button,
+html[data-theme="light"] .page-description,
+html[data-theme="light"] .dashboard-subtitle,
+html[data-theme="light"] .stat-title,
+html[data-theme="light"] .stat-description,
+html[data-theme="light"] .section-description,
+html[data-theme="light"] .page-eyebrow,
+html[data-theme="light"] .member-meta,
+html[data-theme="light"] .member-details,
+html[data-theme="light"] .member-detail-label,
+html[data-theme="light"] .member-expanded-details,
+html[data-theme="light"] .plan-card-label,
+html[data-theme="light"] .payment-card-label,
+html[data-theme="light"] .class-card-label,
+html[data-theme="light"] .branch-card-label,
+html[data-theme="light"] .trainer-card-label,
+html[data-theme="light"] .login-brand span,
+html[data-theme="light"] .login-heading p,
+html[data-theme="light"] .mobile-sheet-item,
+html[data-theme="light"] .mobile-tab-item {
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .brand-text h2,
+html[data-theme="light"] .admin-info strong,
+html[data-theme="light"] .page-header h1,
+html[data-theme="light"] .dashboard-header h1,
+html[data-theme="light"] .section-heading h2,
+html[data-theme="light"] .dashboard-stat-card .stat-number,
+html[data-theme="light"] .member-card h2,
+html[data-theme="light"] .member-name-row h3,
+html[data-theme="light"] .member-profile-heading h4,
+html[data-theme="light"] .membership-detail-block strong,
+html[data-theme="light"] .member-expanded-details strong,
+html[data-theme="light"] [class$="-form-heading"] h2,
+html[data-theme="light"] [class$="-card"] h2,
+html[data-theme="light"] [class$="-state"] h3,
+html[data-theme="light"] .login-brand strong,
+html[data-theme="light"] .login-heading h1,
+html[data-theme="light"] .mobile-sheet-header h3 {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .nav-link:hover,
+html[data-theme="light"] .nav-link.active,
+html[data-theme="light"] .mobile-tab-item:hover,
+html[data-theme="light"] .mobile-tab-item:focus-visible {
+  background: #f1eafe;
+  color: var(--accent);
+}
+
+html[data-theme="light"] .admin-avatar,
+html[data-theme="light"] .mobile-admin-badge,
+html[data-theme="light"] .mobile-sheet-close,
+html[data-theme="light"] .mobile-sheet-drag-handle,
+html[data-theme="light"] .refresh-button,
+html[data-theme="light"] .view-all,
+html[data-theme="light"] .member-detail-close,
+html[data-theme="light"] .secondary-action {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] [class$="-input-wrap"] {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--accent);
+}
+
+html[data-theme="light"] input:not([type="checkbox"]):not([type="file"]),
+html[data-theme="light"] select,
+html[data-theme="light"] textarea {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+  color-scheme: light;
+}
+
+html[data-theme="light"] [class$="-input-wrap"] input,
+html[data-theme="light"] [class$="-input-wrap"] select {
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+html[data-theme="light"] select option {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .form-field label,
+html[data-theme="light"] [class$="-field"],
+html[data-theme="light"] .member-edit-fields label,
+html[data-theme="light"] .member-photo-edit {
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .members-table-container {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .members-table th {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .members-table td,
+html[data-theme="light"] .members-table tr {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .members-table tr:hover,
+html[data-theme="light"] .member-table-row:focus-visible {
+  background: #f8f5ff;
+}
+
+html[data-theme="light"] .members-table .member-table-name,
+html[data-theme="light"] .member-name-cell strong {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .theme-toggle,
+html[data-theme="light"] .mobile-sheet-theme {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] [class$="-secondary-button"],
+html[data-theme="light"] [class$="-danger-button"],
+html[data-theme="light"] .member-action,
+html[data-theme="light"] .member-upload-button {
+  box-shadow: none;
+}
+
+html[data-theme="light"] [class$="-secondary-button"] {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] [class$="-primary-button"],
+html[data-theme="light"] .login-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+html[data-theme="light"] [class$="-primary-button"]:hover,
+html[data-theme="light"] .login-button:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+html[data-theme="light"] [class$="-danger-button"] {
+  background: #fff1f0;
+  border-color: #fecdca;
+  color: var(--danger);
+}
+
+html[data-theme="light"] .member-feedback.success,
+html[data-theme="light"] .settings-feedback-success {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647;
+}
+
+html[data-theme="light"] .member-feedback.error,
+html[data-theme="light"] [class$="-feedback"],
+html[data-theme="light"] .login-error,
+html[data-theme="light"] .member-delete-confirmation {
+  background: #fff1f0;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
+html[data-theme="light"] .member-delete-confirmation strong {
+  color: #912018;
+}
+
+html[data-theme="light"] .mobile-more-overlay,
+html[data-theme="light"] .mobile-filter-overlay,
+html[data-theme="light"] .member-detail-modal,
+html[data-theme="light"] .class-edit-overlay {
+  background: rgba(15, 23, 42, 0.38);
+}
+
+html[data-theme="light"] .mobile-more-sheet,
+html[data-theme="light"] .mobile-filter-sheet {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] .mobile-sheet-item:hover,
+html[data-theme="light"] .mobile-sheet-item.active {
+  background: #f1eafe;
+  color: var(--accent);
+}
+
+html[data-theme="light"] .mobile-sheet-item {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .mobile-sheet-icon {
+  color: var(--text-muted);
+}
+
+html[data-theme="light"] .mobile-sheet-item.active .mobile-sheet-icon {
+  color: var(--accent);
+}
+
+html[data-theme="light"] .mobile-sheet-logout,
+html[data-theme="light"] .mobile-sheet-logout .mobile-sheet-icon {
+  color: var(--danger);
+}
+
+html[data-theme="light"] .mobile-sheet-theme .mobile-sheet-icon {
+  color: var(--accent);
+}
+
+html[data-theme="light"] .dashboard .expiring-container {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] .search-box input,
+html[data-theme="light"] .filter-box select {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .search-box input::placeholder {
+  color: var(--text-muted);
+}
+
+html[data-theme="light"] .mobile-filter-trigger {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .mobile-filter-trigger:hover,
+html[data-theme="light"] .mobile-filter-trigger:focus-visible {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .mobile-filter-trigger.active {
+  background: #f1eafe;
+  border-color: #d6bbfb;
+  color: var(--accent);
+}
+
+html[data-theme="light"] .mobile-filter-header h3 {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .mobile-filter-close,
+html[data-theme="light"] .mobile-filter-clear-btn {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .mobile-filter-close:hover,
+html[data-theme="light"] .mobile-filter-clear-btn:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .mobile-filter-select-wrap select {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .member-expanded-area {
+  background: var(--surface);
+}
+
+html[data-theme="light"] .member-expanded-details > div {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .member-expanded-details > div strong,
+html[data-theme="light"] .member-edit-fields input,
+html[data-theme="light"] .member-edit-fields select {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .member-edit-fields input,
+html[data-theme="light"] .member-edit-fields select {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+html[data-theme="light"] .membership-detail-block {
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .membership-detail-block svg,
+html[data-theme="light"] .member-expanded-details > div svg {
+  color: var(--accent);
+}
+
+html[data-theme="light"] [class$="-form-heading"] p,
+html[data-theme="light"] [class$="-card-details"],
+html[data-theme="light"] [class$="-card-meta"],
+html[data-theme="light"] .membership-card-meta,
+html[data-theme="light"] .plan-perks,
+html[data-theme="light"] .member-detail-content {
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] [class$="-form"],
+html[data-theme="light"] [class$="-form-actions"],
+html[data-theme="light"] [class$="-detail-block"],
+html[data-theme="light"] .membership-detail-block,
+html[data-theme="light"] .member-expanded-area {
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .member-details-button,
+html[data-theme="light"] .edit-action,
+html[data-theme="light"] .member-upload-button {
+  background: #f1eafe;
+  border-color: #d6bbfb;
+  color: #6d28d9;
+}
+
+html[data-theme="light"] .delete-action {
+  background: #fff1f0;
+  border-color: #fecdca;
+  color: var(--danger);
+}
+
+html[data-theme="light"] .membership-status-expired,
+html[data-theme="light"] .class-booking-status-cancelled {
+  background: #fff1f0;
+  border-color: #fecdca;
+  color: var(--danger);
+}
+
+html[data-theme="light"] .membership-status-expiring-soon {
+  background: #fffaeb;
+  border-color: #fedf89;
+  color: var(--warning);
+}
+
+html[data-theme="light"] .class-booking-status-completed {
+  background: #f4efff;
+  border-color: #e4d7ff;
+  color: #6d28d9;
+}
+
+html[data-theme="light"] .settings-page .branch-total {
+  background: #f4efff !important;
+  border-color: #e4d7ff !important;
+  color: #6d28d9;
+}
+
+html[data-theme="light"] .settings-page .branch-state h3[style],
+html[data-theme="light"] .settings-page .branch-state svg[style] {
+  color: var(--danger) !important;
+}
+
+html[data-theme="light"] .settings-page .logo-preview-box small[style] {
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="light"] .logout-button:hover {
+  background: #fff1f0;
+  color: var(--danger);
+}
+
+html[data-theme="light"] .payment-method-badge,
+html[data-theme="light"] .branch-total,
+html[data-theme="light"] .trainer-total,
+html[data-theme="light"] .plan-total,
+html[data-theme="light"] .membership-total,
+html[data-theme="light"] .payment-total,
+html[data-theme="light"] .class-total,
+html[data-theme="light"] .class-booking-total,
+html[data-theme="light"] .equipment-total,
+html[data-theme="light"] .trainer-branch-total,
+html[data-theme="light"] .admin-total {
+  background: #f4efff;
+  border-color: #e4d7ff;
+  color: #6d28d9;
+}
+
+html[data-theme="light"] .member-status,
+html[data-theme="light"] .member-status-badge,
+html[data-theme="light"] .membership-status-active,
+html[data-theme="light"] .class-booking-status-booked {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647;
+}
+
+html[data-theme="light"] .equipment-quantity {
+  background: #f4efff;
+  border-color: #e4d7ff;
+  color: #6d28d9;
+}
+
+@media (max-width: 768px) {
+  html[data-theme="light"] .mobile-header,
+  html[data-theme="light"] .mobile-bottom-nav {
+    background: var(--surface);
+    border-color: var(--border);
+  }
+
+  html[data-theme="light"] .mobile-sheet-list {
+    overflow-y: auto;
   }
 }
 

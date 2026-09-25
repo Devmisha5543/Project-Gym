@@ -3,6 +3,7 @@ import { classSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { CalendarDays, Clock3, Dumbbell, MapPin, Plus, Save, Users } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function ClassForm({ onClassCreated }) {
   const [branches, setBranches] = useState([])
@@ -14,15 +15,28 @@ function ClassForm({ onClassCreated }) {
   const [durationMinutes, setDurationMinutes] = useState('')
   const [capacity, setCapacity] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [loadingOptions, setLoadingOptions] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/branches`)
-      .then(response => response.json())
-      .then(data => setBranches(data))
-
-    fetch(`${API_URL}/trainers`)
-      .then(response => response.json())
-      .then(data => setTrainers(data))
+    Promise.all([
+      authFetch(`${API_URL}/branches`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load branches')
+          return response.json()
+        })
+        .then(setBranches)
+        .catch(() => setLookupError('Unable to load branches or trainers. Please try again.')),
+      authFetch(`${API_URL}/trainers`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load trainers')
+          return response.json()
+        })
+        .then(setTrainers)
+        .catch(() => setLookupError('Unable to load branches or trainers. Please try again.'))
+    ]).finally(() => setLoadingOptions(false))
   }, [])
 
   function handleSubmit(event) {
@@ -38,6 +52,8 @@ function ClassForm({ onClassCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newClass = {
       branch_id: branchId,
@@ -53,7 +69,11 @@ function ClassForm({ onClassCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newClass)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create class.')
+        return data
+      })
       .then(() => {
         setBranchId('')
         setTrainerId('')
@@ -62,7 +82,10 @@ function ClassForm({ onClassCreated }) {
         setDurationMinutes('')
         setCapacity('')
         onClassCreated()
+        setFeedback({ type: 'success', message: 'Class scheduled successfully.' })
       })
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create class.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -76,6 +99,8 @@ function ClassForm({ onClassCreated }) {
           <p>Set up a class, instructor, time, and capacity.</p>
         </div>
       </div>
+
+      <FeedbackMessage message={lookupError} />
 
       <form className="class-form" onSubmit={handleSubmit}>
         <div className="class-form-grid">
@@ -144,9 +169,10 @@ function ClassForm({ onClassCreated }) {
           </label>
         </div>
 
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="class-form-actions">
-          <button type="submit" className="class-primary-button">
-            <Save size={16} /> Add Class
+          <button type="submit" className="class-primary-button" disabled={submitting || loadingOptions}>
+            <Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Class'}
           </button>
         </div>
       </form>

@@ -3,6 +3,7 @@ import { classBookingSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { CalendarCheck, CalendarDays, Dumbbell, Save, UserRound } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function ClassBookingForm({ onClassBookingCreated }) {
   const [members, setMembers] = useState([])
@@ -12,15 +13,28 @@ function ClassBookingForm({ onClassBookingCreated }) {
   const [bookingDate, setBookingDate] = useState('')
   const [status, setStatus] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [loadingOptions, setLoadingOptions] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/members`)
-      .then(response => response.json())
-      .then(data => setMembers(data))
-
-    fetch(`${API_URL}/classes`)
-      .then(response => response.json())
-      .then(data => setClasses(data))
+    Promise.all([
+      authFetch(`${API_URL}/members`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load members')
+          return response.json()
+        })
+        .then(setMembers)
+        .catch(() => setLookupError('Unable to load members or classes. Please try again.')),
+      authFetch(`${API_URL}/classes`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load classes')
+          return response.json()
+        })
+        .then(setClasses)
+        .catch(() => setLookupError('Unable to load members or classes. Please try again.'))
+    ]).finally(() => setLoadingOptions(false))
   }, [])
 
   function handleSubmit(event) {
@@ -36,6 +50,8 @@ function ClassBookingForm({ onClassBookingCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newBooking = {
       member_id: memberId,
@@ -49,7 +65,11 @@ function ClassBookingForm({ onClassBookingCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newBooking)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create class booking.')
+        return data
+      })
       .then(() => {
         setMemberId('')
         setClassId('')
@@ -57,10 +77,13 @@ function ClassBookingForm({ onClassBookingCreated }) {
         setStatus('')
         onClassBookingCreated()
       })
+      .then(() => setFeedback({ type: 'success', message: 'Class booking created successfully.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create class booking.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
-    <section className="class-booking-form-section"><div className="class-booking-form-heading"><div className="class-booking-form-icon"><CalendarCheck size={19} /></div><div><h2>Book a Class</h2><p>Reserve a place for a member in a scheduled class.</p></div></div><form className="class-booking-form" onSubmit={handleSubmit}>
+    <section className="class-booking-form-section"><div className="class-booking-form-heading"><div className="class-booking-form-icon"><CalendarCheck size={19} /></div><div><h2>Book a Class</h2><p>Reserve a place for a member in a scheduled class.</p></div></div><form className="class-booking-form" onSubmit={handleSubmit}><FeedbackMessage message={lookupError} />
       <div className="class-booking-form-grid"><label className="class-booking-field"><span>Member</span><div className="class-booking-input-wrap"><UserRound size={16} /><select value={memberId} onChange={e => setMemberId(e.target.value)} required>
         <option value="">-- Select a member --</option>
         {members.map(member => (
@@ -86,7 +109,8 @@ function ClassBookingForm({ onClassBookingCreated }) {
         <option value="cancelled">Cancelled</option>
         <option value="completed">Completed</option>
       </select></div></label></div>
-      <div className="class-booking-form-actions"><button type="submit" className="class-booking-primary-button"><Save size={16} /> Add Booking</button></div>
+      <FeedbackMessage message={feedback?.message} type={feedback?.type} />
+      <div className="class-booking-form-actions"><button type="submit" className="class-booking-primary-button" disabled={submitting || loadingOptions}><Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Booking'}</button></div>
     </form></section>
   )
 }

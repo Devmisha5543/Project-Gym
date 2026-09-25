@@ -1,149 +1,118 @@
-import { useState, useEffect } from 'react'
-import { memberSchema } from './schemas'
+import { useEffect, useState } from 'react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import {
-  UserPlus,
-  Upload,
-  X,
+  CreditCard,
   ChevronDown
 } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
-function MemberForm({ onMemberCreated }) {
+function MembershipForm({ onMembershipCreated }) {
+  const [members, setMembers] = useState([])
+  const [plans, setPlans] = useState([])
 
-  const [branches, setBranches] = useState([])
-  const [branchId, setBranchId] = useState('')
-  const [name, setName] = useState('')
-  const [gender, setGender] = useState('')
-  const [phone, setPhone] = useState('')
-  const [address, setAddress] = useState('')
-  const [joinDate, setJoinDate] = useState(
+  const [memberId, setMemberId] = useState('')
+  const [planId, setPlanId] = useState('')
+  const [startDate, setStartDate] = useState(
     new Date().toISOString().split('T')[0]
   )
+  const [endDate, setEndDate] = useState('')
+  const [status, setStatus] = useState('active')
 
-  const [wantsTrainer, setWantsTrainer] = useState(false)
-  const [photo, setPhoto] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
-
-  const [errors, setErrors] = useState({})
+  const [loadingData, setLoadingData] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
-
-    fetch(`${API_URL}/branches`)
-      .then(response => response.json())
-      .then(data => setBranches(data))
-      .catch(error => {
-        console.error('Failed to load branches:', error)
-      })
-
-  }, [])
-
-  function handlePhotoChange(event) {
-
-    const file = event.target.files[0]
-
-    if (!file) return
-
-    setPhoto(file)
-
-    const preview = URL.createObjectURL(file)
-
-    setPhotoPreview(preview)
-  }
-
-  function removePhoto() {
-
-    setPhoto(null)
-    setPhotoPreview(null)
-  }
-
-  function resetForm() {
-
-    setBranchId('')
-    setName('')
-    setGender('')
-    setPhone('')
-    setAddress('')
-    setJoinDate(
-      new Date().toISOString().split('T')[0]
-    )
-    setWantsTrainer(false)
-    setPhoto(null)
-    setPhotoPreview(null)
-    setErrors({})
-  }
-
-  function handleSubmit(event) {
-
-    event.preventDefault()
-
-    const result = memberSchema.safeParse({
-      name,
-      phone,
-      email: ''
-    })
-
-    if (!result.success) {
-
-      const fieldErrors = {}
-
-      result.error.issues.forEach(issue => {
-        fieldErrors[issue.path[0]] = issue.message
-      })
-
-      setErrors(fieldErrors)
-
-      return
-    }
-
-    setErrors({})
-    setSubmitting(true)
-
-    const formData = new FormData()
-
-    formData.append('branch_id', branchId)
-    formData.append('name', name)
-    formData.append('gender', gender)
-    formData.append('phone', phone)
-    formData.append('address', address)
-    formData.append('join_date', joinDate)
-    formData.append('wants_trainer', wantsTrainer)
-
-    if (photo) {
-      formData.append('photo', photo)
-    }
-
-    authFetch(`${API_URL}/members`, {
-      method: 'POST',
-      body: formData
-    })
-      .then(response => {
-
+    Promise.all([
+      authFetch(`${API_URL}/members`).then(async response => {
         if (!response.ok) {
-          throw new Error('Failed to create member')
+          throw new Error('Failed to load members')
+        }
+
+        return response.json()
+      }),
+
+      authFetch(`${API_URL}/membershipplans`).then(async response => {
+        if (!response.ok) {
+          throw new Error('Failed to load membership plans')
         }
 
         return response.json()
       })
-      .then(() => {
-
-        resetForm()
-
-        onMemberCreated()
-
-        setOpen(false)
-
+    ])
+      .then(([memberData, planData]) => {
+        setMembers(Array.isArray(memberData) ? memberData : [])
+        setPlans(Array.isArray(planData) ? planData : [])
       })
       .catch(error => {
+        console.error('Failed to load membership form data:', error)
+        setError('Unable to load members or membership plans.')
+      })
+      .finally(() => {
+        setLoadingData(false)
+      })
+  }, [])
 
-        console.error(error)
+  function resetForm() {
+    setMemberId('')
+    setPlanId('')
+    setStartDate(new Date().toISOString().split('T')[0])
+    setEndDate('')
+    setStatus('active')
+    setError('')
+  }
 
-        setErrors({
-          general: 'Unable to create member. Please try again.'
-        })
+  function handleSubmit(event) {
+    event.preventDefault()
 
+    if (!memberId || !planId || !startDate || !endDate) {
+      setError('Please complete all required fields.')
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+    setSuccessMessage('')
+
+    authFetch(`${API_URL}/memberships`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        member_id: Number(memberId),
+        plan_id: Number(planId),
+        start_date: startDate,
+        end_date: endDate,
+        status
+      })
+    })
+      .then(async response => {
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || 'Failed to create membership'
+          )
+        }
+
+        return data
+      })
+      .then(() => {
+        resetForm()
+        setOpen(false)
+        onMembershipCreated()
+        setSuccessMessage('Membership created successfully.')
+      })
+      .catch(error => {
+        console.error('Failed to create membership:', error)
+
+        setError(
+          error.message || 'Unable to create membership.'
+        )
       })
       .finally(() => {
         setSubmitting(false)
@@ -151,25 +120,24 @@ function MemberForm({ onMemberCreated }) {
   }
 
   return (
-    <div className="member-form-section">
+    <div className="membership-form-section">
 
-      {/* Form header */}
       <button
         className="add-member-header"
         type="button"
         onClick={() => setOpen(!open)}
       >
-
         <div className="add-member-title">
 
           <div className="add-member-icon">
-            <UserPlus size={21} />
+            <CreditCard size={21} />
           </div>
 
           <div>
-            <strong>Add New Member</strong>
+            <strong>Add Membership</strong>
+
             <span>
-              Register a new gym member
+              Assign a membership plan to a member
             </span>
           </div>
 
@@ -179,203 +147,118 @@ function MemberForm({ onMemberCreated }) {
           size={22}
           className={open ? 'rotate-icon' : ''}
         />
-
       </button>
 
-      {/* Form */}
       {open && (
-
         <form
           className="member-form"
           onSubmit={handleSubmit}
         >
 
-          {errors.general && (
+          {error && (
             <div className="form-error">
-              {errors.general}
+              {error}
             </div>
           )}
 
-          <div className="form-grid">
+          {loadingData ? (
+            <div className="membership-state">
+              <div className="loading-spinner"></div>
 
-            <div className="form-field">
+              <p>
+                Loading members and membership plans...
+              </p>
+            </div>
+          ) : (
+            <div className="form-grid">
 
-              <label>Branch</label>
+              <div className="form-field">
+                <label>Member</label>
 
-              <select
-                value={branchId}
-                onChange={e => setBranchId(e.target.value)}
-                required
-              >
-                <option value="">
-                  Select a branch
-                </option>
-
-                {branches.map(branch => (
-                  <option
-                    key={branch.branch_id}
-                    value={branch.branch_id}
-                  >
-                    {branch.name}
+                <select
+                  value={memberId}
+                  onChange={e => setMemberId(e.target.value)}
+                  required
+                >
+                  <option value="">
+                    Select a member
                   </option>
-                ))}
 
-              </select>
+                  {members.map(member => (
+                    <option
+                      key={member.member_id}
+                      value={member.member_id}
+                    >
+                      {member.name} — {member.phone}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            </div>
+              <div className="form-field">
+                <label>Membership Plan</label>
 
-            <div className="form-field">
+                <select
+                  value={planId}
+                  onChange={e => setPlanId(e.target.value)}
+                  required
+                >
+                  <option value="">
+                    Select a membership plan
+                  </option>
 
-              <label>Full Name</label>
+                  {plans.map(plan => (
+                    <option
+                      key={plan.plan_id}
+                      value={plan.plan_id}
+                    >
+                      {plan.plan_name} — {plan.price}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                type="text"
-                placeholder="Enter member name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-              />
+              <div className="form-field">
+                <label>Start Date</label>
 
-              {errors.name && (
-                <span className="field-error">
-                  {errors.name}
-                </span>
-              )}
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  required
+                />
+              </div>
 
-            </div>
+              <div className="form-field">
+                <label>End Date</label>
 
-            <div className="form-field">
+                <input
+                  type="date"
+                  value={endDate}
+                  min={startDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  required
+                />
+              </div>
 
-              <label>Gender</label>
+              <div className="form-field">
+                <label>Status</label>
 
-              <select
-                value={gender}
-                onChange={e => setGender(e.target.value)}
-                required
-              >
-                <option value="">
-                  Select gender
-                </option>
+                <select
+                  value={status}
+                  onChange={e => setStatus(e.target.value)}
+                >
+                  <option value="active">
+                    Active
+                  </option>
 
-                <option value="Male">
-                  Male
-                </option>
-
-                <option value="Female">
-                  Female
-                </option>
-
-              </select>
-
-            </div>
-
-            <div className="form-field">
-
-              <label>Phone</label>
-
-              <input
-                type="text"
-                placeholder="09XXXXXXXX"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                required
-              />
-
-              {errors.phone && (
-                <span className="field-error">
-                  {errors.phone}
-                </span>
-              )}
-
-            </div>
-
-            <div className="form-field">
-
-              <label>Address</label>
-
-              <input
-                type="text"
-                placeholder="Member address"
-                value={address}
-                onChange={e => setAddress(e.target.value)}
-                required
-              />
+                  <option value="expired">
+                    Expired
+                  </option>
+                </select>
+              </div>
 
             </div>
-
-            <div className="form-field">
-
-              <label>Join Date</label>
-
-              <input
-                type="date"
-                value={joinDate}
-                onChange={e => setJoinDate(e.target.value)}
-                required
-              />
-
-            </div>
-
-          </div>
-
-          {/* Bottom options */}
-          <div className="form-bottom">
-
-            <label className="trainer-checkbox">
-
-              <input
-                type="checkbox"
-                checked={wantsTrainer}
-                onChange={e =>
-                  setWantsTrainer(e.target.checked)
-                }
-              />
-
-              <span>
-                Member wants a personal trainer
-              </span>
-
-            </label>
-
-            <label className="photo-upload">
-
-              <Upload size={17} />
-
-              <span>
-                {photo
-                  ? photo.name
-                  : 'Upload profile photo'}
-              </span>
-
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-              />
-
-            </label>
-
-          </div>
-
-          {/* Preview */}
-          {photoPreview && (
-
-            <div className="photo-preview">
-
-              <img
-                src={photoPreview}
-                alt="Preview"
-              />
-
-              <button
-                type="button"
-                onClick={removePhoto}
-              >
-                <X size={16} />
-              </button>
-
-            </div>
-
           )}
 
           <div className="form-actions">
@@ -394,22 +277,22 @@ function MemberForm({ onMemberCreated }) {
             <button
               type="submit"
               className="primary-button"
-              disabled={submitting}
+              disabled={submitting || loadingData}
             >
               {submitting
-                ? 'Adding Member...'
-                : 'Add Member'}
+                ? 'Creating Membership...'
+                : 'Create Membership'}
             </button>
 
           </div>
 
         </form>
-
       )}
+
+      <FeedbackMessage message={successMessage} type="success" />
 
     </div>
   )
 }
 
-export default MemberForm
-
+export default MembershipForm

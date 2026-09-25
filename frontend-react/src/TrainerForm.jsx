@@ -3,6 +3,7 @@ import { trainerSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { Award, Mail, Phone, Plus, Save, UserRound } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function TrainerForm({ onTrainerCreated }) {
   const [name, setName] = useState('')
@@ -10,6 +11,8 @@ function TrainerForm({ onTrainerCreated }) {
   const [email, setEmail] = useState('')
   const [certification, setCertification] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -24,6 +27,8 @@ function TrainerForm({ onTrainerCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newTrainer = { name, phone, email, certification }
 
@@ -32,14 +37,21 @@ function TrainerForm({ onTrainerCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainer)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create trainer.')
+        return data
+      })
       .then(() => {
         setName('')
         setPhone('')
         setEmail('')
         setCertification('')
         onTrainerCreated()
+        setFeedback({ type: 'success', message: 'Trainer created successfully.' })
       })
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create trainer.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -93,9 +105,10 @@ function TrainerForm({ onTrainerCreated }) {
           </label>
         </div>
 
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="trainer-form-actions">
-          <button type="submit" className="trainer-primary-button">
-            <Save size={16} /> Add Trainer
+          <button type="submit" className="trainer-primary-button" disabled={submitting}>
+            <Save size={16} /> {submitting ? 'Creating...' : 'Add Trainer'}
           </button>
         </div>
       </form>

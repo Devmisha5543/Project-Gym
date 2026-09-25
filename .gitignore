@@ -26,6 +26,9 @@ npm-debug.log*
 # --- Database ---
 *.sqlite3
 *.db
+/gym_db_backup.dump
+/new_member.json
+/uploads/*
 
 # --- Editor / OS junk ---
 .vscode/

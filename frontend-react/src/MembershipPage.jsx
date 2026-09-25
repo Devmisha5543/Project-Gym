@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import MembershipList from './MembershipList'
@@ -13,7 +14,7 @@ function MembershipPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/memberships`)
+    authFetch(`${API_URL}/memberships`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Memberships request failed: ${response.status}`)

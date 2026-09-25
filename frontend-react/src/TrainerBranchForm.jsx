@@ -3,6 +3,7 @@ import { trainerBranchSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { GitBranch, MapPin, Save, UserRound } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -10,15 +11,28 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
   const [trainerId, setTrainerId] = useState('')
   const [branchId, setBranchId] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [loadingOptions, setLoadingOptions] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/trainers`)
-      .then(response => response.json())
-      .then(data => setTrainers(data))
-
-    fetch(`${API_URL}/branches`)
-      .then(response => response.json())
-      .then(data => setBranches(data))
+    Promise.all([
+      authFetch(`${API_URL}/trainers`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load trainers')
+          return response.json()
+        })
+        .then(setTrainers)
+        .catch(() => setLookupError('Unable to load trainers or branches. Please try again.')),
+      authFetch(`${API_URL}/branches`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load branches')
+          return response.json()
+        })
+        .then(setBranches)
+        .catch(() => setLookupError('Unable to load trainers or branches. Please try again.'))
+    ]).finally(() => setLoadingOptions(false))
   }, [])
 
   function handleSubmit(event) {
@@ -34,6 +48,8 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newTrainerBranch = {
       trainer_id: trainerId,
@@ -45,16 +61,23 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newTrainerBranch)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create trainer branch link.')
+        return data
+      })
       .then(() => {
         setTrainerId('')
         setBranchId('')
         onTrainerBranchCreated()
       })
+      .then(() => setFeedback({ type: 'success', message: 'Trainer branch link created successfully.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create trainer branch link.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
-    <section className="trainer-branch-form-section"><div className="trainer-branch-form-heading"><div className="trainer-branch-form-icon"><GitBranch size={19} /></div><div><h2>Link Trainer to Branch</h2><p>Define where a trainer is available to coach.</p></div></div><form className="trainer-branch-form" onSubmit={handleSubmit}><div className="trainer-branch-form-grid"><label className="trainer-branch-field"><span>Trainer</span><div className="trainer-branch-input-wrap"><UserRound size={16} /><select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
+    <section className="trainer-branch-form-section"><div className="trainer-branch-form-heading"><div className="trainer-branch-form-icon"><GitBranch size={19} /></div><div><h2>Link Trainer to Branch</h2><p>Define where a trainer is available to coach.</p></div></div><form className="trainer-branch-form" onSubmit={handleSubmit}><FeedbackMessage message={lookupError} /><div className="trainer-branch-form-grid"><label className="trainer-branch-field"><span>Trainer</span><div className="trainer-branch-input-wrap"><UserRound size={16} /><select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
         <option value="">-- Select a trainer --</option>
         {trainers.map(trainer => (
           <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
@@ -64,7 +87,7 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
         {branches.map(branch => (
           <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
         ))}
-      </select></div>{errors.branchId && <small className="trainer-branch-field-error">{errors.branchId}</small>}</label></div><div className="trainer-branch-form-actions"><button type="submit" className="trainer-branch-primary-button"><Save size={16} /> Add Link</button></div></form></section>
+      </select></div>{errors.branchId && <small className="trainer-branch-field-error">{errors.branchId}</small>}</label></div><FeedbackMessage message={feedback?.message} type={feedback?.type} /><div className="trainer-branch-form-actions"><button type="submit" className="trainer-branch-primary-button" disabled={submitting || loadingOptions}><Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Link'}</button></div></form></section>
   )
 }
 

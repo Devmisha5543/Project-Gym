@@ -2,6 +2,7 @@ import { UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { API_URL } from './config'
 import MemberDetail from './MemberDetail'
+import MemberPhoto from './MemberPhoto'
 
 function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFeedback }) {
   const [selectedMember, setSelectedMember] = useState(null)
@@ -138,22 +139,6 @@ function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFee
         </div>
       )}
     </>
-  )
-}
-
-function MemberPhoto({ member, photoUrl, alt }) {
-  const [failed, setFailed] = useState(false)
-
-  if (!photoUrl || failed) {
-    return <span>{member.name?.charAt(0).toUpperCase() || '?'}</span>
-  }
-
-  return (
-    <img
-      src={photoUrl}
-      alt={alt}
-      onError={() => setFailed(true)}
-    />
   )
 }
 

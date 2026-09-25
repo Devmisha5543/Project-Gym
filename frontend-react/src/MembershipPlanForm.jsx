@@ -3,12 +3,15 @@ import { membershipPlanSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { Check, CreditCard, DollarSign, Plus, Sparkles } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function MembershipPlanForm({ onMembershipPlanCreated }) {
   const [planName, setPlanName] = useState('')
   const [price, setPrice] = useState('')
   const [perks, setPerks] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -23,6 +26,8 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newPlan = {
       plan_name: planName,
@@ -35,13 +40,20 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newPlan)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create membership plan.')
+        return data
+      })
       .then(() => {
         setPlanName('')
         setPrice('')
         setPerks('')
         onMembershipPlanCreated()
+        setFeedback({ type: 'success', message: 'Membership plan created successfully.' })
       })
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create membership plan.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -85,9 +97,10 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
           </label>
         </div>
 
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="plan-form-actions">
-          <button type="submit" className="plan-primary-button">
-            <Check size={16} /> Add Plan
+          <button type="submit" className="plan-primary-button" disabled={submitting}>
+            <Check size={16} /> {submitting ? 'Creating...' : 'Add Plan'}
           </button>
         </div>
       </form>

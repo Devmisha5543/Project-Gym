@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import PersonalTrainingAssignmentList from './PersonalTrainingAssignmentList'
@@ -13,7 +14,7 @@ function PersonalTrainingAssignmentPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/personaltrainingassignments`)
+    authFetch(`${API_URL}/personaltrainingassignments`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Assignments request failed: ${response.status}`)

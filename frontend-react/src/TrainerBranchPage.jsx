@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import TrainerBranchList from './TrainerBranchList'
@@ -11,7 +12,7 @@ function TrainerBranchPage() {
 
   function loadTrainerBranches() {
     setLoading(true); setPageError('')
-    fetch(`${API_URL}/trainerbranch`)
+    authFetch(`${API_URL}/trainerbranch`)
       .then(response => { if (!response.ok) throw new Error(`Trainer branches request failed: ${response.status}`); return response.json() })
       .then(data => setTrainerBranches(data))
       .catch(error => { console.error('Failed to load trainer branches:', error); setTrainerBranches([]); setPageError('Unable to load trainer branches. Please try again.') })

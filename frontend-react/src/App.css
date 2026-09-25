@@ -1977,6 +1977,8 @@
   .class-booking-state-icon, .equipment-state-icon, .trainer-branch-state-icon, .admin-state-icon { width: 52px; height: 52px; }
 
   .class-booking-list, .equipment-list, .trainer-branch-list, .admin-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+  .equipment-card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .equipment-edit-grid { margin-top: 14px; }
   .class-booking-card, .equipment-card, .trainer-branch-card, .admin-card { display: flex; align-items: flex-start; gap: 15px; min-width: 0; min-height: 145px; padding: 20px; border: 1px solid #202020; border-radius: 12px; background: linear-gradient(145deg,#121212,#0e0e0e); box-shadow: 0 8px 22px rgba(0,0,0,.14); transition: transform .2s ease,border-color .2s ease,box-shadow .2s ease; }
   .class-booking-card:hover, .equipment-card:hover, .trainer-branch-card:hover, .admin-card:hover { transform: translateY(-3px); border-color: #353535; box-shadow: 0 14px 30px rgba(0,0,0,.2); }
   .class-booking-card-icon, .equipment-card-icon, .trainer-branch-card-icon, .admin-card-icon { width: 44px; height: 44px; }
@@ -2542,7 +2544,7 @@
 }
 
 .expiring-member:hover {
-  background: #111111;
+  background: var(--surface-elevated);
 }
 
 .member-avatar {
@@ -2995,33 +2997,15 @@
 .form-field select {
   width: 100%;
   box-sizing: border-box;
-  padding: 12px 13px;
-  border: 1px solid #292929;
-  border-radius: 10px;
-  background: #0d0d0d;
-  color: #f5f5f5;
-  outline: none;
-  transition: .2s ease;
-}
-
-.form-field input,
-.form-field select {
-  background: transparent;
-  color: #f5f5f5;
   border: 1px solid #292929;
   border-radius: 9px;
   min-height: 44px;
   padding: 10px 12px;
   background: #0b0b0b;
+  color: #f5f5f5;
+  outline: none;
   box-shadow: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-field input:focus,
-.form-field select:focus {
-  outline: none;
-  border-color: #aa3bff;
-  box-shadow: 0 0 0 3px rgba(170, 59, 255, .12);
 }
 
 .form-field input::placeholder {
@@ -3731,6 +3715,30 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
+}
+
+.feedback-message {
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.feedback-message--success {
+  border-color: rgba(34, 197, 94, .3);
+  background: rgba(34, 197, 94, .1);
+  color: #86efac;
+}
+
+.feedback-message--error {
+  border-color: rgba(239, 68, 68, .3);
+  background: rgba(239, 68, 68, .1);
+  color: #fca5a5;
 }
 
 .member-upload-button input {

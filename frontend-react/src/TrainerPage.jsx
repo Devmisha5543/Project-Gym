@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import TrainerList from './TrainerList'
@@ -13,7 +14,7 @@ function TrainerPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/trainers`)
+    authFetch(`${API_URL}/trainers`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Trainers request failed: ${response.status}`)

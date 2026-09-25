@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import PaymentList from './PaymentList'
@@ -13,7 +14,7 @@ function PaymentPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/payments`)
+    authFetch(`${API_URL}/payments`)
       .then(response => {
         if (!response.ok) {
           throw new Error(

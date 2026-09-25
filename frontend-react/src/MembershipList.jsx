@@ -127,6 +127,7 @@ function MembershipList({
       }
     } catch (err) {
       console.error('Failed to update membership:', err)
+
       setError(
         err.message || 'Unable to update membership.'
       )
@@ -168,6 +169,7 @@ function MembershipList({
       }
     } catch (err) {
       console.error('Failed to delete membership:', err)
+
       setError(
         err.message || 'Unable to delete membership.'
       )
@@ -203,6 +205,7 @@ function MembershipList({
       )}
 
       {memberships.map(membership => (
+
         <article
           className="membership-card"
           key={membership.membership_id}
@@ -225,11 +228,13 @@ function MembershipList({
                 <div className="membership-card-title-row">
 
                   <div>
+
                     <span className="membership-card-label">
                       Editing Membership #{membership.membership_id}
                     </span>
 
                     <h2>Edit Membership</h2>
+
                   </div>
 
                 </div>
@@ -237,9 +242,11 @@ function MembershipList({
                 <div className="membership-form-grid">
 
                   <label className="membership-field">
+
                     <span>Member ID</span>
 
                     <div className="membership-input-wrap">
+
                       <UserRound size={16} />
 
                       <input
@@ -253,13 +260,17 @@ function MembershipList({
                         }
                         disabled={saving}
                       />
+
                     </div>
+
                   </label>
 
                   <label className="membership-field">
+
                     <span>Plan ID</span>
 
                     <div className="membership-input-wrap">
+
                       <CreditCard size={16} />
 
                       <input
@@ -273,13 +284,17 @@ function MembershipList({
                         }
                         disabled={saving}
                       />
+
                     </div>
+
                   </label>
 
                   <label className="membership-field">
+
                     <span>Start Date</span>
 
                     <div className="membership-input-wrap">
+
                       <CalendarDays size={16} />
 
                       <input
@@ -293,13 +308,17 @@ function MembershipList({
                         }
                         disabled={saving}
                       />
+
                     </div>
+
                   </label>
 
                   <label className="membership-field">
+
                     <span>End Date</span>
 
                     <div className="membership-input-wrap">
+
                       <CalendarDays size={16} />
 
                       <input
@@ -313,13 +332,17 @@ function MembershipList({
                         }
                         disabled={saving}
                       />
+
                     </div>
+
                   </label>
 
                   <label className="membership-field">
+
                     <span>Status</span>
 
                     <div className="membership-input-wrap">
+
                       <CreditCard size={16} />
 
                       <select
@@ -332,6 +355,7 @@ function MembershipList({
                         }
                         disabled={saving}
                       >
+
                         <option value="">
                           Select status
                         </option>
@@ -347,8 +371,11 @@ function MembershipList({
                         <option value="cancelled">
                           Cancelled
                         </option>
+
                       </select>
+
                     </div>
+
                   </label>
 
                 </div>
@@ -365,11 +392,13 @@ function MembershipList({
                     }
                     disabled={saving}
                   >
+
                     <Save size={15} />
 
                     {saving
                       ? 'Saving...'
                       : 'Save Changes'}
+
                   </button>
 
                   <button
@@ -378,9 +407,11 @@ function MembershipList({
                     onClick={cancelEditing}
                     disabled={saving}
                   >
+
                     <X size={15} />
 
                     Cancel
+
                   </button>
 
                 </div>
@@ -394,16 +425,20 @@ function MembershipList({
                  ========================= */
 
               <>
+
                 <div className="membership-card-title-row">
 
                   <div>
+
                     <span className="membership-card-label">
                       Membership #{membership.membership_id}
                     </span>
 
                     <h2>
-                      Member {membership.member_id}
+                      {membership.member_name ||
+                        `Member ${membership.member_id}`}
                     </h2>
+
                   </div>
 
                   <span
@@ -422,13 +457,15 @@ function MembershipList({
                   <span>
                     <UserRound size={15} />
 
-                    Member #{membership.member_id}
+                    {membership.member_name ||
+                      `Member #${membership.member_id}`}
                   </span>
 
                   <span>
                     <CreditCard size={15} />
 
-                    Plan #{membership.plan_id}
+                    {membership.plan_name ||
+                      `Plan #${membership.plan_id}`}
                   </span>
 
                 </div>
@@ -436,23 +473,31 @@ function MembershipList({
                 <div className="membership-card-dates">
 
                   <div>
+
                     <span>Starts</span>
 
                     <strong>
+
                       <CalendarDays size={14} />
 
                       {membership.start_date}
+
                     </strong>
+
                   </div>
 
                   <div>
+
                     <span>Expires</span>
 
                     <strong>
+
                       <CalendarDays size={14} />
 
                       {membership.end_date}
+
                     </strong>
+
                   </div>
 
                 </div>
@@ -466,9 +511,11 @@ function MembershipList({
                       startEditing(membership)
                     }
                   >
+
                     <Pencil size={15} />
 
                     Edit
+
                   </button>
 
                   <button
@@ -482,21 +529,28 @@ function MembershipList({
                       membership.membership_id
                     }
                   >
+
                     <Trash2 size={15} />
 
                     {deletingId ===
                     membership.membership_id
                       ? 'Deleting...'
                       : 'Delete'}
+
                   </button>
 
                 </div>
+
               </>
+
             )}
 
           </div>
+
         </article>
+
       ))}
+
     </div>
   )
 }

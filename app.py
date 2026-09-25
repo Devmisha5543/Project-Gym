@@ -29,12 +29,13 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://192.168.1.4:5173",
+    "http://192.168.1.6:5173",
     "http://192.168.1.3:5173",
-    "http://192.168.1.7:5173",
     "https://project-gym-zeta.vercel.app"
 ])
 
@@ -57,6 +58,20 @@ def token_required(f):
             return jsonify({"error": "Invalid token"}), 401
 
         request.decoded_token = decoded
+        return f(*args, **kwargs)
+
+    return decorated
+
+def super_admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        admin_id = request.decoded_token.get("admin_id")
+
+        if admin_id != 1:
+            return jsonify({
+                "error": "Only the super admin can manage administrator accounts"
+            }), 403
+
         return f(*args, **kwargs)
 
     return decorated
@@ -92,6 +107,21 @@ def get_authenticated_gym_id(conn=None):
             conn.close()
 
 REQUEST_BODY_JSON_ERROR = "Request body must be valid JSON"
+ALLOWED_MEMBER_PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
+def is_valid_member_photo(file):
+    filename = secure_filename(file.filename)
+    extension = os.path.splitext(filename)[1].lower()
+    header = file.stream.read(12)
+    file.stream.seek(0)
+    valid_signatures = {
+        ".jpg": header.startswith(b"\xff\xd8\xff"),
+        ".jpeg": header.startswith(b"\xff\xd8\xff"),
+        ".png": header.startswith(b"\x89PNG\r\n\x1a\n"),
+        ".gif": header.startswith((b"GIF87a", b"GIF89a")),
+        ".webp": header[:4] == b"RIFF" and header[8:12] == b"WEBP",
+    }
+    return extension in ALLOWED_MEMBER_PHOTO_EXTENSIONS and valid_signatures.get(extension, False)
 
 @app.route("/gym", methods=["GET"])
 @token_required
@@ -198,14 +228,19 @@ def update_gym():
         return jsonify({"error": "Failed to update gym details"}), 500
 
 @app.route("/uploads/<filename>")
+@token_required
 def get_uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    response = send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 @app.route("/")
 def home():
     return "Gym Management System backend is running!"
 
 @app.route("/db-check", methods=["GET"])
+@token_required
 def db_check():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -232,6 +267,7 @@ def db_check():
     })
 
 @app.route("/branches")
+@token_required
 def get_branches():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -348,6 +384,7 @@ def update_branch(branch_id):
     return jsonify({"message": f"Branch {branch_id} updated"}), 200
 
 @app.route("/members")
+@token_required
 def get_members():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -391,6 +428,8 @@ def create_member():
     if "photo" in request.files:
         file = request.files["photo"]
         if file.filename != "":
+            if not is_valid_member_photo(file):
+                return jsonify({"error": "Upload a valid JPG, PNG, GIF, or WebP image."}), 400
             photo_filename = secure_filename(file.filename)
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
 
@@ -448,6 +487,8 @@ def update_member(member_id):
     if is_multipart and "photo" in request.files:
         file = request.files["photo"]
         if file.filename != "":
+            if not is_valid_member_photo(file):
+                return jsonify({"error": "Upload a valid JPG, PNG, GIF, or WebP image."}), 400
             photo_filename = secure_filename(file.filename)
             file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
 
@@ -497,6 +538,7 @@ def update_member(member_id):
     
 
 @app.route("/trainers")
+@token_required
 def get_trainers():
     conn=get_db_connection()
 
@@ -597,49 +639,45 @@ def update_trainer(trainer_id):
 
     return jsonify({"message": f"Trainer {trainer_id} updated"}), 200
 
-@app.route("/memberships")
-def get_memberships():
-    conn=get_db_connection()
 
-    cursor=conn.cursor()
-    cursor.execute("SELECT membership_id, member_id, plan_id, start_date, end_date, status FROM membership;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    memberships = []
-    for row in rows:
-        memberships.append({
-            "membership_id": row[0],
-            "member_id": row[1],
-            "plan_id": row[2],
-            "start_date": row[3],
-            "end_date": row[4],
-            "status": row[5]
-        })
-
-    return jsonify(memberships)
 
 @app.route("/memberships/expiring")
+@token_required
 def get_expiring_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
+
     cursor.execute("""
-        SELECT membership.membership_id, membership.member_id, member.branch_id,
-               member.name, member.gender, member.phone, member.address,
-               member.join_date, member.wants_trainer, member.photo_filename,
-               membership.start_date, membership.end_date, membership.status
+        SELECT
+            membership.membership_id,
+            member.member_id,
+            member.branch_id,
+            member.name,
+            member.gender,
+            member.phone,
+            member.address,
+            member.join_date,
+            member.wants_trainer,
+            member.photo_filename,
+            membership.start_date,
+            membership.end_date,
+            membership.status
         FROM membership
-        JOIN member ON membership.member_id = member.member_id
-        WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
-        AND membership.status = 'active'
+        JOIN member
+            ON membership.member_id = member.member_id
+        WHERE membership.end_date >= CURRENT_DATE - INTERVAL '30 days'
+          AND membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
+          AND membership.status = 'active'
         ORDER BY membership.end_date ASC;
     """)
+
     rows = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
     expiring = []
+
     for row in rows:
         expiring.append({
             "membership_id": row[0],
@@ -651,11 +689,11 @@ def get_expiring_memberships():
             "member_phone": row[5],
             "phone": row[5],
             "address": row[6],
-            "join_date": row[7],
+            "join_date": row[7].isoformat() if row[7] else None,
             "wants_trainer": row[8],
             "photo_filename": row[9],
-            "start_date": row[10].isoformat(),
-            "end_date": row[11].isoformat(),
+            "start_date": row[10].isoformat() if row[10] else None,
+            "end_date": row[11].isoformat() if row[11] else None,
             "status": row[12]
         })
 
@@ -735,7 +773,7 @@ def update_membership(membership_id):
     return jsonify({"message": f"Membership {membership_id} updated"}), 200
 
 @app.route("/personaltrainingassignments")
-
+@token_required
 def get_personal_trainer_assignments():
     conn=get_db_connection()
 
@@ -831,6 +869,7 @@ def update_personal_trainer_assignment(assignment_id):
     return jsonify({"message": f"Personal trainer assignment {assignment_id} updated"}), 200
 
 @app.route("/classbookings")
+@token_required
 def get_class_bookings():
     conn=get_db_connection()
 
@@ -925,6 +964,7 @@ def update_class_booking(booking_id):
     return jsonify({"message": f"Class booking {booking_id} updated"}), 200
 
 @app.route("/classes")
+@token_required
 def get_classes():
     conn=get_db_connection()
 
@@ -1020,6 +1060,7 @@ def update_class(class_id):
     return jsonify({"message": f"Class {class_id} updated"}), 200
 
 @app.route("/payments")
+@token_required
 def get_payments():
     conn=get_db_connection()
     cursor=conn.cursor()
@@ -1112,6 +1153,7 @@ def update_payment(payment_id):
     return jsonify({"message": f"Payment {payment_id} updated"}), 200
 
 @app.route("/equipment")
+@token_required
 def get_equipment():
     conn=get_db_connection()
 
@@ -1205,6 +1247,7 @@ def update_equipment(equipment_id):
     return jsonify({"message": f"Equipment {equipment_id} updated"}), 200
 
 @app.route("/trainerbranch")
+@token_required
 def get_trainer_branch():
     conn=get_db_connection()
 
@@ -1268,16 +1311,71 @@ def delete_trainer_branch(trainer_id, branch_id):
 
     return jsonify({"message": f"Trainer-Branch relationship deleted for trainer {trainer_id} and branch {branch_id}"}), 200
 
+@app.route("/memberships")
+@token_required
+def get_memberships():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            m.membership_id,
+            m.member_id,
+            mem.name AS member_name,
+            m.plan_id,
+            mp.plan_name,
+            mp.price,
+            m.start_date,
+            m.end_date,
+            m.status
+        FROM membership m
+        JOIN member mem
+            ON m.member_id = mem.member_id
+        JOIN membershipplan mp
+            ON m.plan_id = mp.plan_id
+        ORDER BY m.membership_id;
+    """)
+
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    memberships = []
+
+    for row in rows:
+        memberships.append({
+            "membership_id": row[0],
+            "member_id": row[1],
+            "member_name": row[2],
+            "plan_id": row[3],
+            "plan_name": row[4],
+            "price": row[5],
+            "start_date": row[6],
+            "end_date": row[7],
+            "status": row[8]
+        })
+
+    return jsonify(memberships)
+
 @app.route("/membershipplans")
+@token_required
 def get_membership_plans():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT plan_id, plan_name, price, perks FROM membershipplan;")
+
+    cursor.execute("""
+        SELECT plan_id, plan_name, price, perks
+        FROM membershipplan;
+    """)
+
     rows = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
     plans = []
+
     for row in rows:
         plans.append({
             "plan_id": row[0],
@@ -1287,7 +1385,6 @@ def get_membership_plans():
         })
 
     return jsonify(plans)
-
 
 @app.route("/membershipplans", methods=["POST"])
 @token_required
@@ -1363,8 +1460,39 @@ def update_membership_plan(plan_id):
 
     return jsonify({"message": f"MembershipPlan {plan_id} updated"}), 200
 
+@app.route("/admins")
+@token_required
+def get_admins():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT admin_id, name, email, phone
+        FROM Admin
+        ORDER BY admin_id ASC;
+    """)
+
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    admins = []
+
+    for row in rows:
+        admins.append({
+            "admin_id": row[0],
+            "name": row[1],
+            "email": row[2],
+            "phone": row[3]
+        })
+
+    return jsonify(admins)
+
+
 @app.route("/admins", methods=["POST"])
 @token_required
+@super_admin_required
 def create_admin():
     data = request.json
 
@@ -1372,24 +1500,191 @@ def create_admin():
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
     required_fields = ["name", "email", "phone", "password"]
-    missing = [field for field in required_fields if field not in data]
+
+    missing = [
+        field for field in required_fields
+        if field not in data or not str(data[field]).strip()
+    ]
+
     if missing:
-        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+        return jsonify({
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
 
     password_hash = generate_password_hash(data["password"])
 
     conn = get_db_connection()
     cursor = conn.cursor()
+
     cursor.execute(
-        "INSERT INTO Admin (name, email, phone, password_hash) VALUES (%s, %s, %s, %s) RETURNING admin_id;",
-        (data["name"], data["email"], data["phone"], password_hash)
+        """
+        INSERT INTO Admin
+        (name, email, phone, password_hash)
+        VALUES (%s, %s, %s, %s)
+        RETURNING admin_id;
+        """,
+        (
+            data["name"],
+            data["email"],
+            data["phone"],
+            password_hash
+        )
     )
+
     new_id = cursor.fetchone()[0]
+
     conn.commit()
     cursor.close()
     conn.close()
 
-    return jsonify({"message": "Admin created", "admin_id": new_id}), 201
+    return jsonify({
+        "message": "Admin created",
+        "admin_id": new_id
+    }), 201
+
+
+@app.route("/admins/<int:admin_id>", methods=["PUT"])
+@token_required
+@super_admin_required
+def update_admin(admin_id):
+    data = request.json
+
+    if not data:
+        return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
+
+    required_fields = ["name", "email", "phone"]
+
+    missing = [
+        field
+        for field in required_fields
+        if field not in data or not str(data[field]).strip()
+    ]
+
+    if missing:
+        return jsonify({
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if data.get("password"):
+        password_hash = generate_password_hash(data["password"])
+
+        cursor.execute(
+            """
+            UPDATE Admin
+            SET name = %s,
+                email = %s,
+                phone = %s,
+                password_hash = %s
+            WHERE admin_id = %s;
+            """,
+            (
+                data["name"],
+                data["email"],
+                data["phone"],
+                password_hash,
+                admin_id
+            )
+        )
+
+    else:
+        cursor.execute(
+            """
+            UPDATE Admin
+            SET name = %s,
+                email = %s,
+                phone = %s
+            WHERE admin_id = %s;
+            """,
+            (
+                data["name"],
+                data["email"],
+                data["phone"],
+                admin_id
+            )
+        )
+
+    if cursor.rowcount == 0:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "error": f"Admin {admin_id} not found"
+        }), 404
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "message": f"Admin {admin_id} updated"
+    }), 200
+
+
+@app.route("/admins/<int:admin_id>", methods=["DELETE"])
+@token_required
+def delete_admin(admin_id):
+    current_admin_id = request.decoded_token.get("admin_id")
+
+    # Only the Super Admin can delete administrators
+    if current_admin_id != 1:
+        return jsonify({
+            "error": "Only the Super Admin can delete administrators"
+        }), 403
+
+    # Super Admin cannot delete themselves
+    if admin_id == current_admin_id:
+        return jsonify({
+            "error": "The Super Admin cannot delete their own account"
+        }), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Make sure the admin exists
+    cursor.execute(
+        "SELECT admin_id FROM Admin WHERE admin_id = %s;",
+        (admin_id,)
+    )
+
+    admin = cursor.fetchone()
+
+    if admin is None:
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "error": f"Admin {admin_id} not found"
+        }), 404
+
+    # Make sure at least one admin remains
+    cursor.execute("SELECT COUNT(*) FROM Admin;")
+    admin_count = cursor.fetchone()[0]
+
+    if admin_count <= 1:
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            "error": "At least one administrator must remain"
+        }), 400
+
+    cursor.execute(
+        "DELETE FROM Admin WHERE admin_id = %s;",
+        (admin_id,)
+    )
+
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return jsonify({
+        "message": f"Admin {admin_id} deleted"
+    }), 200
 
 @app.route("/login", methods=["POST"])
 def login():

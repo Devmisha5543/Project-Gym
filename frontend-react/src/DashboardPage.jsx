@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
+import FeedbackMessage from './FeedbackMessage'
+import {authFetch } from './authFetch'
 import { useGym } from './GymContext'
 import MemberDetail from './MemberDetail'
 import {
@@ -21,18 +23,20 @@ function DashboardPage() {
   const [classCount, setClassCount] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [selectedMembership, setSelectedMembership] = useState(null)
   const [branches, setBranches] = useState([])
 
   function loadDashboard() {
     setLoading(true)
+    setLoadError('')
 
     Promise.all([
-      fetch(`${API_URL}/members`).then(response => response.json()),
-      fetch(`${API_URL}/classes`).then(response => response.json()),
-      fetch(`${API_URL}/payments`).then(response => response.json()),
-      fetch(`${API_URL}/memberships/expiring`).then(response => response.json()),
-      fetch(`${API_URL}/branches`).then(response => response.json()),
+      authFetch(`${API_URL}/members`).then(response => response.json()),
+      authFetch(`${API_URL}/classes`).then(response => response.json()),
+      authFetch(`${API_URL}/payments`).then(response => response.json()),
+      authFetch(`${API_URL}/memberships/expiring`).then(response => response.json()),
+      authFetch(`${API_URL}/branches`).then(response => response.json()),
     ])
       .then(([members, classes, payments, expiringMemberships, branchData]) => {
         setMemberCount(Array.isArray(members) ? members.length : 0)
@@ -56,6 +60,7 @@ function DashboardPage() {
       })
       .catch(error => {
         console.error('Dashboard loading error:', error)
+        setLoadError('Unable to load dashboard data. Please try again.')
       })
       .finally(() => {
         setLoading(false)
@@ -97,6 +102,8 @@ function DashboardPage() {
         </button>
 
       </section>
+
+      <FeedbackMessage message={loadError} />
 
 
       {/* STATISTICS */}
@@ -322,7 +329,7 @@ function DashboardPage() {
 
                 <div
                   className="expiring-member"
-                  key={membership.membership_id}
+                  key={membership.member_id}
                 >
 
                   <div className="member-avatar">
@@ -350,18 +357,26 @@ function DashboardPage() {
                   <div className="expiry-date">
 
                     <span className="expiry-label">
-                      Expires
+                      {membership.status === 'no_membership'
+                        ? 'Membership'
+                        : 'Expires'}
                     </span>
 
                     <strong>
-                      {membership.end_date}
+                      {membership.status === 'no_membership'
+                        ? 'None'
+                        : membership.end_date}
                     </strong>
 
                   </div>
 
+
                   <span className="expiry-status">
                     <span className="expiry-status-dot"></span>
-                    Due soon
+
+                    {membership.status === 'no_membership'
+                      ? 'No active membership'
+                      : 'Due soon'}
                   </span>
 
 

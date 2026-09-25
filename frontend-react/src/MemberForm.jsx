@@ -8,11 +8,14 @@ import {
   X,
   ChevronDown
 } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function MemberForm({ onMemberCreated }) {
-
   const [branches, setBranches] = useState([])
+  const [plans, setPlans] = useState([])
+
   const [branchId, setBranchId] = useState('')
+  const [planId, setPlanId] = useState('')
   const [name, setName] = useState('')
   const [gender, setGender] = useState('')
   const [phone, setPhone] = useState('')
@@ -26,22 +29,62 @@ function MemberForm({ onMemberCreated }) {
   const [photoPreview, setPhotoPreview] = useState(null)
 
   const [errors, setErrors] = useState({})
+  const [successMessage, setSuccessMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [open, setOpen] = useState(false)
+  const [loadingBranches, setLoadingBranches] = useState(true)
+  const [loadingPlans, setLoadingPlans] = useState(true)
+  const [lookupError, setLookupError] = useState('')
 
   useEffect(() => {
+    authFetch(`${API_URL}/branches`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load branches')
+        }
 
-    fetch(`${API_URL}/branches`)
-      .then(response => response.json())
-      .then(data => setBranches(data))
+        return response.json()
+      })
+      .then(data => {
+        setBranches(Array.isArray(data) ? data : [])
+      })
       .catch(error => {
         console.error('Failed to load branches:', error)
+        setBranches([])
+        setLookupError('Unable to load branches. Please try again.')
       })
+      .finally(() => {
+        setLoadingBranches(false)
+      })
+  }, [])
 
+  useEffect(() => {
+    authFetch(`${API_URL}/membershipplans`)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to load membership plans')
+        }
+
+        return response.json()
+      })
+      .then(data => {
+        setPlans(Array.isArray(data) ? data : [])
+      })
+      .catch(error => {
+        console.error(
+          'Failed to load membership plans:',
+          error
+        )
+
+        setPlans([])
+        setLookupError('Unable to load membership plans. Please try again.')
+      })
+      .finally(() => {
+        setLoadingPlans(false)
+      })
   }, [])
 
   function handlePhotoChange(event) {
-
     const file = event.target.files[0]
 
     if (!file) return
@@ -54,29 +97,37 @@ function MemberForm({ onMemberCreated }) {
   }
 
   function removePhoto() {
-
     setPhoto(null)
     setPhotoPreview(null)
   }
 
   function resetForm() {
-
     setBranchId('')
+    setPlanId('')
     setName('')
     setGender('')
     setPhone('')
     setAddress('')
+
     setJoinDate(
       new Date().toISOString().split('T')[0]
     )
+
     setWantsTrainer(false)
     setPhoto(null)
     setPhotoPreview(null)
     setErrors({})
   }
 
-  function handleSubmit(event) {
+  function calculateMembershipEndDate(startDate) {
+    const date = new Date(`${startDate}T00:00:00`)
 
+    date.setDate(date.getDate() + 30)
+
+    return date.toISOString().split('T')[0]
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const result = memberSchema.safeParse({
@@ -86,7 +137,6 @@ function MemberForm({ onMemberCreated }) {
     })
 
     if (!result.success) {
-
       const fieldErrors = {}
 
       result.error.issues.forEach(issue => {
@@ -98,56 +148,158 @@ function MemberForm({ onMemberCreated }) {
       return
     }
 
-    setErrors({})
-    setSubmitting(true)
+    if (!branchId) {
+      setErrors({
+        branch: 'Please select a branch.'
+      })
 
-    const formData = new FormData()
-
-    formData.append('branch_id', branchId)
-    formData.append('name', name)
-    formData.append('gender', gender)
-    formData.append('phone', phone)
-    formData.append('address', address)
-    formData.append('join_date', joinDate)
-    formData.append('wants_trainer', wantsTrainer)
-
-    if (photo) {
-      formData.append('photo', photo)
+      return
     }
 
-    authFetch(`${API_URL}/members`, {
-      method: 'POST',
-      body: formData
-    })
-      .then(response => {
+    if (!gender) {
+      setErrors({
+        gender: 'Please select a gender.'
+      })
 
-        if (!response.ok) {
-          throw new Error('Failed to create member')
+      return
+    }
+
+    if (!planId) {
+      setErrors({
+        plan: 'Please select a membership plan.'
+      })
+
+      return
+    }
+
+    if (loadingBranches || loadingPlans) {
+      setErrors({
+        general: 'Member options are still loading. Please wait.'
+      })
+
+      return
+    }
+
+    setErrors({})
+    setSuccessMessage('')
+    setSubmitting(true)
+
+    try {
+      /*
+       * STEP 1
+       * Create the member.
+       */
+      const formData = new FormData()
+
+      formData.append('branch_id', branchId)
+      formData.append('name', name)
+      formData.append('gender', gender)
+      formData.append('phone', phone)
+      formData.append('address', address)
+      formData.append('join_date', joinDate)
+      formData.append('wants_trainer', wantsTrainer)
+
+      if (photo) {
+        formData.append('photo', photo)
+      }
+
+      const memberResponse = await authFetch(
+        `${API_URL}/members`,
+        {
+          method: 'POST',
+          body: formData
         }
+      )
 
-        return response.json()
-      })
-      .then(() => {
+      const memberData = await memberResponse.json()
 
-        resetForm()
+      if (!memberResponse.ok) {
+        throw new Error(
+          memberData.error ||
+          'Failed to create member.'
+        )
+      }
 
+      /*
+       * The backend returns the newly-created member_id.
+       */
+      const newMemberId = memberData.member_id
+
+      if (!newMemberId) {
+        throw new Error(
+          'Member was created but no member ID was returned.'
+        )
+      }
+
+      /*
+       * STEP 2
+       * Create the initial membership for the new member.
+       *
+       * Memberships currently require:
+       * member_id
+       * plan_id
+       * start_date
+       * end_date
+       * status
+       *
+       * For initial registration we use a 30-day membership.
+       */
+      const endDate = calculateMembershipEndDate(joinDate)
+
+      const membershipResponse = await authFetch(
+        `${API_URL}/memberships`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            member_id: Number(newMemberId),
+            plan_id: Number(planId),
+            start_date: joinDate,
+            end_date: endDate,
+            status: 'active'
+          })
+        }
+      )
+
+      const membershipData =
+        await membershipResponse.json()
+
+      if (!membershipResponse.ok) {
+        throw new Error(
+          membershipData.error ||
+          'Member was created, but the membership could not be created.'
+        )
+      }
+
+      /*
+       * Both records now exist successfully.
+       */
+      resetForm()
+
+      if (onMemberCreated) {
         onMemberCreated()
+      }
 
-        setOpen(false)
+      setOpen(false)
+      setSuccessMessage('Member created successfully.')
 
+    } catch (error) {
+      console.error(
+        'Failed to create member and membership:',
+        error
+      )
+
+      setErrors({
+        general:
+          error.message ||
+          'Unable to create member. Please try again.'
       })
-      .catch(error => {
 
-        console.error(error)
-
-        setErrors({
-          general: 'Unable to create member. Please try again.'
-        })
-
-      })
-      .finally(() => {
-        setSubmitting(false)
-      })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -168,6 +320,7 @@ function MemberForm({ onMemberCreated }) {
 
           <div>
             <strong>Add New Member</strong>
+
             <span>
               Register a new gym member
             </span>
@@ -196,8 +349,45 @@ function MemberForm({ onMemberCreated }) {
             </div>
           )}
 
+          <FeedbackMessage message={lookupError} />
+
           <div className="form-grid">
 
+            {/* Branch */}
+            <div className="form-field">
+
+              <label>Branch</label>
+
+              <select
+                value={branchId}
+                onChange={e => setBranchId(e.target.value)}
+                required
+              >
+
+                <option value="">
+                  Select a branch
+                </option>
+
+                {branches.map(branch => (
+                  <option
+                    key={branch.branch_id}
+                    value={branch.branch_id}
+                  >
+                    {branch.name}
+                  </option>
+                ))}
+
+              </select>
+
+              {errors.branch && (
+                <span className="field-error">
+                  {errors.branch}
+                </span>
+              )}
+
+            </div>
+
+            {/* Full Name */}
             <div className="form-field">
 
               <label>Full Name</label>
@@ -218,6 +408,40 @@ function MemberForm({ onMemberCreated }) {
 
             </div>
 
+            {/* Gender */}
+            <div className="form-field">
+
+              <label>Gender</label>
+
+              <select
+                value={gender}
+                onChange={e => setGender(e.target.value)}
+                required
+              >
+
+                <option value="">
+                  Select gender
+                </option>
+
+                <option value="Male">
+                  Male
+                </option>
+
+                <option value="Female">
+                  Female
+                </option>
+
+              </select>
+
+              {errors.gender && (
+                <span className="field-error">
+                  {errors.gender}
+                </span>
+              )}
+
+            </div>
+
+            {/* Phone */}
             <div className="form-field">
 
               <label>Phone</label>
@@ -238,57 +462,7 @@ function MemberForm({ onMemberCreated }) {
 
             </div>
 
-            <div className="form-field">
-
-              <label>Gender</label>
-
-              <select
-                value={gender}
-                onChange={e => setGender(e.target.value)}
-                required
-              >
-                <option value="">
-                  Select gender
-                </option>
-
-                <option value="Male">
-                  Male
-                </option>
-
-                <option value="Female">
-                  Female
-                </option>
-
-              </select>
-
-            </div>
-
-            <div className="form-field">
-
-              <label>Branch</label>
-
-              <select
-                value={branchId}
-                onChange={e => setBranchId(e.target.value)}
-                required
-              >
-                <option value="">
-                  Select a branch
-                </option>
-
-                {branches.map(branch => (
-                  <option
-                    key={branch.branch_id}
-                    value={branch.branch_id}
-                  >
-                    {branch.name}
-                  </option>
-                ))}
-
-              </select>
-
-            </div>
-
+            {/* Address */}
             <div className="form-field">
 
               <label>Address</label>
@@ -303,6 +477,7 @@ function MemberForm({ onMemberCreated }) {
 
             </div>
 
+            {/* Join Date */}
             <div className="form-field">
 
               <label>Join Date</label>
@@ -313,6 +488,43 @@ function MemberForm({ onMemberCreated }) {
                 onChange={e => setJoinDate(e.target.value)}
                 required
               />
+
+            </div>
+
+            {/* Membership Plan */}
+            <div className="form-field">
+
+              <label>Membership Plan</label>
+
+              <select
+                value={planId}
+                onChange={e => setPlanId(e.target.value)}
+                required
+                disabled={loadingPlans}
+              >
+
+                <option value="">
+                  {loadingPlans
+                    ? 'Loading membership plans...'
+                    : 'Select a membership plan'}
+                </option>
+
+                {plans.map(plan => (
+                  <option
+                    key={plan.plan_id}
+                    value={plan.plan_id}
+                  >
+                    {plan.plan_name} — {plan.price}
+                  </option>
+                ))}
+
+              </select>
+
+              {errors.plan && (
+                <span className="field-error">
+                  {errors.plan}
+                </span>
+              )}
 
             </div>
 
@@ -387,6 +599,7 @@ function MemberForm({ onMemberCreated }) {
                 resetForm()
                 setOpen(false)
               }}
+              disabled={submitting}
             >
               Cancel
             </button>
@@ -394,10 +607,10 @@ function MemberForm({ onMemberCreated }) {
             <button
               type="submit"
               className="primary-button"
-              disabled={submitting}
+              disabled={submitting || loadingBranches || loadingPlans}
             >
               {submitting
-                ? 'Adding Member...'
+                ? 'Registering Member...'
                 : 'Add Member'}
             </button>
 
@@ -406,6 +619,8 @@ function MemberForm({ onMemberCreated }) {
         </form>
 
       )}
+
+      <FeedbackMessage message={successMessage} type="success" />
 
     </div>
   )

@@ -1,3 +1,4 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect } from 'react'
 import { API_URL } from './config'
 import BranchList from './BranchList'
@@ -13,7 +14,7 @@ function BranchPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/branches`)
+    authFetch(`${API_URL}/branches`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Branches request failed: ${response.status}`)

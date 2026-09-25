@@ -1,8 +1,10 @@
+import { authFetch } from './authFetch'
 import { useState, useEffect, useSyncExternalStore } from 'react'
 import { API_URL } from './config'
 import MemberList from './MemberList'
 import MemberForm from './MemberForm'
 import { Search, Users, Building2, Filter, X, AlertCircle, RotateCcw } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function subscribeToMobile(callback) {
   const mql = window.matchMedia('(max-width: 768px)')
@@ -34,6 +36,7 @@ function MembersPage() {
   const [tempGender, setTempGender] = useState('')
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
+  const [memberFeedback, setMemberFeedback] = useState(null)
 
   function openMobileFilter() {
     setTempBranch(branchFilter)
@@ -80,7 +83,7 @@ function MembersPage() {
     setLoading(true)
     setPageError('')
 
-    fetch(`${API_URL}/members`)
+    authFetch(`${API_URL}/members`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Members request failed: ${response.status}`)
@@ -112,7 +115,7 @@ function MembersPage() {
   }
 
   function loadBranches() {
-    fetch(`${API_URL}/branches`)
+    authFetch(`${API_URL}/branches`)
       .then(response => {
         if (!response.ok) {
           throw new Error(`Branches request failed: ${response.status}`)
@@ -203,6 +206,7 @@ function MembersPage() {
       <MemberForm
         onMemberCreated={loadMembers}
       />
+      <FeedbackMessage message={memberFeedback?.message} type={memberFeedback?.type} />
 
 
       {/* Search / Filters */}
@@ -470,6 +474,7 @@ function MembersPage() {
           branches={branches}
           onMemberUpdated={handleMemberUpdated}
           onMemberDeleted={handleMemberDeleted}
+          onFeedback={(message, type) => setMemberFeedback({ message, type })}
         />
 
       )}

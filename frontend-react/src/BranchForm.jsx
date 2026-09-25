@@ -3,6 +3,7 @@ import { branchSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { Building2, MapPin, Phone, Plus, Save } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function BranchForm({ onBranchCreated }) {
   const [name, setName] = useState('')
@@ -10,6 +11,8 @@ function BranchForm({ onBranchCreated }) {
   const [phone, setPhone] = useState('')
   const [city, setCity] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -24,6 +27,8 @@ function BranchForm({ onBranchCreated }) {
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newBranch = { name, address, phone, city }
 
@@ -32,14 +37,21 @@ function BranchForm({ onBranchCreated }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newBranch)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create branch.')
+        return data
+      })
       .then(() => {
         setName('')
         setAddress('')
         setPhone('')
         setCity('')
         onBranchCreated()
+        setFeedback({ type: 'success', message: 'Branch created successfully.' })
       })
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create branch.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -91,9 +103,10 @@ function BranchForm({ onBranchCreated }) {
           </label>
         </div>
 
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="branch-form-actions">
-          <button type="submit" className="branch-primary-button">
-            <Save size={16} /> Add Branch
+          <button type="submit" className="branch-primary-button" disabled={submitting}>
+            <Save size={16} /> {submitting ? 'Creating...' : 'Add Branch'}
           </button>
         </div>
       </form>

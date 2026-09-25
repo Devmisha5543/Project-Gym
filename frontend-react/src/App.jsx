@@ -26,6 +26,8 @@ import LoginPage from './LoginPage'
 import MobileNavigation from './MobileNavigation'
 import SettingsPage from './SettingsPage'
 import { GymProvider, useGym, GymBrandMark } from './GymContext'
+import { Moon, Sun } from 'lucide-react'
+import { ThemeProvider, useTheme } from './ThemeContext'
 
 
 const navigation = [
@@ -73,6 +75,7 @@ function ProtectedLayout() {
 
   const navigate = useNavigate()
   const { gym, loading: gymLoading } = useGym()
+  const { theme, toggleTheme } = useTheme()
 
   function handleLogout() {
     localStorage.removeItem('token')
@@ -147,6 +150,17 @@ function ProtectedLayout() {
         {/* SIDEBAR FOOTER */}
         <div className="sidebar-footer">
 
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-pressed={theme === 'light'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
+
           <div className="admin-profile">
 
             <div className="admin-avatar">
@@ -214,6 +228,7 @@ function LoginRoute() {
 function App() {
 
   return (
+    <ThemeProvider>
     <Routes>
 
       {/* LOGIN */}
@@ -325,6 +340,7 @@ function App() {
       />
 
     </Routes>
+    </ThemeProvider>
   )
 }
 

@@ -3,6 +3,7 @@ import { personalTrainingAssignmentSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { Activity, CalendarDays, Check, Dumbbell, UserRound, Users } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
   const [trainers, setTrainers] = useState([])
@@ -13,15 +14,28 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
   const [startDate, setStartDate] = useState('')
   const [status, setStatus] = useState('')
   const [errors, setErrors] = useState({})
+  const [feedback, setFeedback] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [loadingOptions, setLoadingOptions] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/trainers`)
-      .then(response => response.json())
-      .then(data => setTrainers(data))
-
-    fetch(`${API_URL}/members`)
-      .then(response => response.json())
-      .then(data => setMembers(data))
+    Promise.all([
+      authFetch(`${API_URL}/trainers`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load trainers')
+          return response.json()
+        })
+        .then(setTrainers)
+        .catch(() => setLookupError('Unable to load trainers or members. Please try again.')),
+      authFetch(`${API_URL}/members`)
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to load members')
+          return response.json()
+        })
+        .then(setMembers)
+        .catch(() => setLookupError('Unable to load trainers or members. Please try again.'))
+    ]).finally(() => setLoadingOptions(false))
   }, [])
 
   function handleSubmit(event) {
@@ -37,6 +51,8 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
       return
     }
     setErrors({})
+    setFeedback(null)
+    setSubmitting(true)
 
     const newAssignment = {
       trainer_id: trainerId,
@@ -51,7 +67,11 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAssignment)
     })
-      .then(response => response.json())
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Unable to create personal training assignment.')
+        return data
+      })
       .then(() => {
         setTrainerId('')
         setMemberId('')
@@ -60,6 +80,9 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
         setStatus('')
         onPersonalTrainingAssignmentCreated()
       })
+      .then(() => setFeedback({ type: 'success', message: 'Personal training assignment created successfully.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create personal training assignment.' }))
+      .finally(() => setSubmitting(false))
   }
 
   return (
@@ -75,6 +98,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
       </div>
 
       <form className="pt-assignment-form" onSubmit={handleSubmit}>
+        <FeedbackMessage message={lookupError} />
         <div className="pt-assignment-form-grid">
           <label className="pt-assignment-field">
             <span>Trainer</span>
@@ -136,9 +160,10 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           </label>
         </div>
 
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="pt-assignment-form-actions">
-          <button type="submit" className="pt-assignment-primary-button">
-            <Check size={16} /> Add Assignment
+          <button type="submit" className="pt-assignment-primary-button" disabled={submitting || loadingOptions}>
+            <Check size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Assignment'}
           </button>
         </div>
       </form>
