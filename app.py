@@ -10,8 +10,84 @@ import jwt
 import datetime
 from functools import wraps
 from flask import request
+import redis
+import json
+import re
 
 load_dotenv()
+
+redis_client = redis.Redis(
+    host="localhost",
+    port=6379,
+    decode_responses=True
+)
+
+try:
+    redis_client.ping()
+    print("Redis connected successfully")
+except redis.RedisError as e:
+    print(f"Redis connection failed: {e}")
+
+def invalidate_members_cache():
+    redis_client.delete("members:all")
+    print("Members cache invalidated") 
+
+def cache_response(cache_key):
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            key = cache_key() if callable(cache_key) else cache_key
+            cached = redis_client.get(key)
+            if cached:
+                return jsonify(json.loads(cached))
+
+            response = f(*args, **kwargs)
+            if response.status_code == 200:
+                redis_client.setex(key, 300, response.get_data(as_text=True))
+            return response
+        return decorated
+    return decorator
+
+def invalidate_caches(*keys):
+    redis_client.delete(*keys)
+
+def invalidate_branches_cache():
+    invalidate_caches(
+        "branches:all", "classes:all", "equipment:all", "trainer_branches:all"
+    )
+
+def invalidate_trainers_cache():
+    invalidate_caches("trainers:all", "classes:all", "trainer_branches:all", "personal_training_assignments:all")
+
+def invalidate_classes_cache():
+    invalidate_caches("classes:all", "class_bookings:all")
+
+def invalidate_memberships_cache():
+    invalidate_caches(
+        "memberships:all", "payments:all",
+        f"memberships:expiring:{datetime.date.today().isoformat()}"
+    )
+
+def invalidate_membership_plans_cache():
+    invalidate_caches("membership_plans:all", "memberships:all")
+
+def invalidate_class_bookings_cache():
+    invalidate_caches("class_bookings:all")
+
+def invalidate_payments_cache():
+    invalidate_caches("payments:all")
+
+def invalidate_equipment_cache():
+    invalidate_caches("equipment:all")
+
+def invalidate_trainer_branches_cache():
+    invalidate_caches("trainer_branches:all")
+
+def invalidate_personal_training_assignments_cache():
+    invalidate_caches("personal_training_assignments:all")
+
+def invalidate_admins_cache():
+    invalidate_caches("admins:all")
 
 def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
@@ -33,9 +109,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://192.168.1.4:5173",
-    "http://192.168.1.6:5173",
-    "http://192.168.1.3:5173",
+    re.compile(r"^http://(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}):5173$"),
     "https://project-gym-zeta.vercel.app"
 ])
 
@@ -268,6 +342,7 @@ def db_check():
 
 @app.route("/branches")
 @token_required
+@cache_response("branches:all")
 def get_branches():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -309,6 +384,7 @@ def create_branch():
     )
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_branches_cache()
     cursor.close()
     conn.close()
 
@@ -333,6 +409,7 @@ def delete_branch(branch_id):
             }), 404
 
         conn.commit()
+        invalidate_branches_cache()
 
         return jsonify({
             "message": f"Branch {branch_id} deleted"
@@ -378,6 +455,7 @@ def update_branch(branch_id):
         return jsonify({"error": f"Branch {branch_id} not found"}), 404
 
     conn.commit()
+    invalidate_branches_cache()
     cursor.close()
     conn.close()
 
@@ -386,10 +464,29 @@ def update_branch(branch_id):
 @app.route("/members")
 @token_required
 def get_members():
+    cache_key = "members:all"
+
+    # 1. Check Redis first
+    cached_members = redis_client.get(cache_key)
+
+    if cached_members:
+        print("Members loaded from Redis")
+        return jsonify(json.loads(cached_members))
+
+    # 2. Cache miss → get data from PostgreSQL
+    print("Members loaded from PostgreSQL")
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT member_id, branch_id,name, gender, phone, address, join_date, wants_trainer, photo_filename FROM member;")
+
+    cursor.execute("""
+        SELECT member_id, branch_id, name, gender, phone, address,
+               join_date, wants_trainer, photo_filename
+        FROM member;
+    """)
+
     rows = cursor.fetchall()
+
     cursor.close()
     conn.close()
 
@@ -408,63 +505,133 @@ def get_members():
             "photo_filename": row[8]
         })
 
-    return jsonify(members)
+    # 3. Store result in Redis for 5 minutes
+    redis_client.setex(
+        cache_key,
+        300,
+        json.dumps(members, default=str)
+    )
 
+    return jsonify(members)
 @app.route("/members", methods=["POST"])
 @token_required
 def create_member():
-    data=request.form
+    data = request.form
 
     if not data:
-
         return jsonify({"error": "Request body must be valid JSON"}), 400
-    
-    required_fields = ["branch_id", "name", "gender", "phone", "address", "join_date", "wants_trainer"]
+
+    required_fields = [
+        "branch_id",
+        "name",
+        "gender",
+        "phone",
+        "address",
+        "join_date",
+        "wants_trainer"
+    ]
+
     missing = [field for field in required_fields if field not in data]
+
     if missing:
-        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+        return jsonify({
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
 
     photo_filename = None
+
     if "photo" in request.files:
         file = request.files["photo"]
+
         if file.filename != "":
             if not is_valid_member_photo(file):
-                return jsonify({"error": "Upload a valid JPG, PNG, GIF, or WebP image."}), 400
+                return jsonify({
+                    "error": "Upload a valid JPG, PNG, GIF, or WebP image."
+                }), 400
+
             photo_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
+            file.save(
+                os.path.join(
+                    app.config["UPLOAD_FOLDER"],
+                    photo_filename
+                )
+            )
 
     conn = get_db_connection()
-    cursor= conn.cursor()
+    cursor = conn.cursor()
+
     cursor.execute(
-        "INSERT INTO Member (branch_id, name, gender, phone, address, join_date, wants_trainer, photo_filename) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING member_id;",
-        (data["branch_id"], data["name"], data["gender"], data["phone"], data["address"], data["join_date"], data["wants_trainer"]=="true", photo_filename)
+        """
+        INSERT INTO Member
+        (branch_id, name, gender, phone, address, join_date,
+         wants_trainer, photo_filename)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING member_id;
+        """,
+        (
+            data["branch_id"],
+            data["name"],
+            data["gender"],
+            data["phone"],
+            data["address"],
+            data["join_date"],
+            data["wants_trainer"] == "true",
+            photo_filename
+        )
     )
+
     new_id = cursor.fetchone()[0]
+
     conn.commit()
+
     cursor.close()
     conn.close()
 
-    return jsonify({"message": "Member created", "member_id": new_id}), 201
+    # Invalidate cached member list after successful creation
+    invalidate_members_cache()
+    invalidate_memberships_cache()
+    invalidate_caches("class_bookings:all", "personal_training_assignments:all")
+
+    return jsonify({
+        "message": "Member created",
+        "member_id": new_id
+    }), 201
+
 
 @app.route("/members/<int:member_id>", methods=["DELETE"])
 @token_required
 def delete_member(member_id):
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM Member WHERE member_id = %s;", (member_id,))
+    cursor.execute(
+        "DELETE FROM Member WHERE member_id = %s;",
+        (member_id,)
+    )
 
     if cursor.rowcount == 0:
         conn.rollback()
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Member {member_id} not found"}), 404
+
+        return jsonify({
+            "error": f"Member {member_id} not found"
+        }), 404
 
     conn.commit()
+
     cursor.close()
     conn.close()
 
-    return jsonify({"message": f"Member {member_id} deleted"}), 200
+    # Invalidate cached member list after successful deletion
+    invalidate_members_cache()
+    invalidate_memberships_cache()
+    invalidate_caches("class_bookings:all", "personal_training_assignments:all")
+
+    return jsonify({
+        "message": f"Member {member_id} deleted"
+    }), 200
+
 
 @app.route("/members/<int:member_id>", methods=["PUT"])
 @token_required
@@ -476,50 +643,148 @@ def update_member(member_id):
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
     required_fields = (
-        ["branch_id", "name", "gender", "phone", "address", "join_date", "wants_trainer"]
-        if is_multipart else ["name", "phone"]
+        [
+            "branch_id",
+            "name",
+            "gender",
+            "phone",
+            "address",
+            "join_date",
+            "wants_trainer"
+        ]
+        if is_multipart
+        else ["name", "phone"]
     )
+
     missing = [field for field in required_fields if field not in data]
+
     if missing:
-        return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
+        return jsonify({
+            "error": f"Missing required fields: {', '.join(missing)}"
+        }), 400
 
     photo_filename = None
+
     if is_multipart and "photo" in request.files:
         file = request.files["photo"]
+
         if file.filename != "":
             if not is_valid_member_photo(file):
-                return jsonify({"error": "Upload a valid JPG, PNG, GIF, or WebP image."}), 400
-            photo_filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
+                return jsonify({
+                    "error": "Upload a valid JPG, PNG, GIF, or WebP image."
+                }), 400
 
-    conn=get_db_connection()
-    cursor=conn.cursor()
+            photo_filename = secure_filename(file.filename)
+
+            file.save(
+                os.path.join(
+                    app.config["UPLOAD_FOLDER"],
+                    photo_filename
+                )
+            )
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
     if not is_multipart:
-        cursor.execute("UPDATE Member SET name = %s, phone = %s WHERE member_id = %s;",
-                       (data["name"], data["phone"], member_id))
-    elif photo_filename:
+
         cursor.execute(
-            "UPDATE Member SET branch_id = %s, name = %s, gender = %s, phone = %s, address = %s, join_date = %s, wants_trainer = %s, photo_filename = %s WHERE member_id = %s;",
-            (data["branch_id"], data["name"], data["gender"], data["phone"], data["address"], data["join_date"], str(data["wants_trainer"]).lower() == "true", photo_filename, member_id)
+            """
+            UPDATE Member
+            SET name = %s, phone = %s
+            WHERE member_id = %s;
+            """,
+            (
+                data["name"],
+                data["phone"],
+                member_id
+            )
         )
-    else:
+
+    elif photo_filename:
+
         cursor.execute(
-            "UPDATE Member SET branch_id = %s, name = %s, gender = %s, phone = %s, address = %s, join_date = %s, wants_trainer = %s WHERE member_id = %s;",
-            (data["branch_id"], data["name"], data["gender"], data["phone"], data["address"], data["join_date"], str(data["wants_trainer"]).lower() == "true", member_id)
+            """
+            UPDATE Member
+            SET branch_id = %s,
+                name = %s,
+                gender = %s,
+                phone = %s,
+                address = %s,
+                join_date = %s,
+                wants_trainer = %s,
+                photo_filename = %s
+            WHERE member_id = %s;
+            """,
+            (
+                data["branch_id"],
+                data["name"],
+                data["gender"],
+                data["phone"],
+                data["address"],
+                data["join_date"],
+                str(data["wants_trainer"]).lower() == "true",
+                photo_filename,
+                member_id
+            )
+        )
+
+    else:
+
+        cursor.execute(
+            """
+            UPDATE Member
+            SET branch_id = %s,
+                name = %s,
+                gender = %s,
+                phone = %s,
+                address = %s,
+                join_date = %s,
+                wants_trainer = %s
+            WHERE member_id = %s;
+            """,
+            (
+                data["branch_id"],
+                data["name"],
+                data["gender"],
+                data["phone"],
+                data["address"],
+                data["join_date"],
+                str(data["wants_trainer"]).lower() == "true",
+                member_id
+            )
         )
 
     if cursor.rowcount == 0:
         conn.rollback()
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Member {member_id} not found"}), 404
+
+        return jsonify({
+            "error": f"Member {member_id} not found"
+        }), 404
 
     conn.commit()
 
-    cursor.execute("SELECT member_id, branch_id, name, gender, phone, address, join_date, wants_trainer, photo_filename FROM member WHERE member_id = %s;", (member_id,))
+    cursor.execute(
+        """
+        SELECT member_id, branch_id, name, gender, phone, address,
+               join_date, wants_trainer, photo_filename
+        FROM member
+        WHERE member_id = %s;
+        """,
+        (member_id,)
+    )
+
     row = cursor.fetchone()
+
     cursor.close()
     conn.close()
+
+    # Invalidate cached member list after successful update
+    invalidate_members_cache()
+    invalidate_memberships_cache()
+    invalidate_caches("class_bookings:all", "personal_training_assignments:all")
 
     return jsonify({
         "message": f"Member {member_id} updated",
@@ -535,10 +800,10 @@ def update_member(member_id):
             "photo_filename": row[8]
         }
     }), 200
-    
 
 @app.route("/trainers")
 @token_required
+@cache_response("trainers:all")
 def get_trainers():
     conn=get_db_connection()
 
@@ -588,6 +853,7 @@ def create_trainer():
 
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_trainers_cache()
     cursor.close()
     conn.close()
     
@@ -608,6 +874,7 @@ def delete_trainer(trainer_id):
         return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
 
     conn.commit()
+    invalidate_trainers_cache()
     cursor.close()
     conn.close()
 
@@ -634,6 +901,7 @@ def update_trainer(trainer_id):
         return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
 
     conn.commit()
+    invalidate_trainers_cache()
     cursor.close()
     conn.close()
 
@@ -643,6 +911,7 @@ def update_trainer(trainer_id):
 
 @app.route("/memberships/expiring")
 @token_required
+@cache_response(lambda: f"memberships:expiring:{datetime.date.today().isoformat()}")
 def get_expiring_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -721,6 +990,7 @@ def create_membership():
 
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_memberships_cache()
     cursor.close()
     conn.close()
 
@@ -741,6 +1011,7 @@ def delete_membership(membership_id):
         return jsonify({"error": f"Membership {membership_id} not found"}), 404
 
     conn.commit()
+    invalidate_memberships_cache()
     cursor.close()
     conn.close()
 
@@ -767,6 +1038,7 @@ def update_membership(membership_id):
         return jsonify({"error": f"Membership {membership_id} not found"}), 404
 
     conn.commit()
+    invalidate_memberships_cache()
     cursor.close()
     conn.close()
 
@@ -774,6 +1046,7 @@ def update_membership(membership_id):
 
 @app.route("/personaltrainingassignments")
 @token_required
+@cache_response("personal_training_assignments:all")
 def get_personal_trainer_assignments():
     conn=get_db_connection()
 
@@ -817,6 +1090,7 @@ def create_personal_trainer_assignment():
 
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_personal_training_assignments_cache()
     cursor.close()
     conn.close()
 
@@ -837,6 +1111,7 @@ def delete_personal_trainer_assignment(assignment_id):
         return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
 
     conn.commit()
+    invalidate_personal_training_assignments_cache()
     cursor.close()
     conn.close()
 
@@ -863,6 +1138,7 @@ def update_personal_trainer_assignment(assignment_id):
         return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
 
     conn.commit()
+    invalidate_personal_training_assignments_cache()
     cursor.close()
     conn.close()
 
@@ -870,6 +1146,7 @@ def update_personal_trainer_assignment(assignment_id):
 
 @app.route("/classbookings")
 @token_required
+@cache_response("class_bookings:all")
 def get_class_bookings():
     conn=get_db_connection()
 
@@ -912,6 +1189,7 @@ def create_class_booking():
                    (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"]))
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_class_bookings_cache()
     cursor.close()
     conn.close()
 
@@ -932,6 +1210,7 @@ def delete_class_booking(booking_id):
         return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
 
     conn.commit()
+    invalidate_class_bookings_cache()
     cursor.close()
     conn.close()
 
@@ -958,6 +1237,7 @@ def update_class_booking(booking_id):
         return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
 
     conn.commit()
+    invalidate_class_bookings_cache()
     cursor.close()
     conn.close()
 
@@ -965,6 +1245,7 @@ def update_class_booking(booking_id):
 
 @app.route("/classes")
 @token_required
+@cache_response("classes:all")
 def get_classes():
     conn=get_db_connection()
 
@@ -1008,6 +1289,7 @@ def create_class():
                    (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"]))
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_classes_cache()
     cursor.close()
     conn.close()
 
@@ -1028,6 +1310,7 @@ def delete_class(class_id):
         return jsonify({"error": f"Class {class_id} not found"}), 404
 
     conn.commit()
+    invalidate_classes_cache()
     cursor.close()
     conn.close()
 
@@ -1054,6 +1337,7 @@ def update_class(class_id):
         return jsonify({"error": f"Class {class_id} not found"}), 404
 
     conn.commit()
+    invalidate_classes_cache()
     cursor.close()
     conn.close()
 
@@ -1061,6 +1345,7 @@ def update_class(class_id):
 
 @app.route("/payments")
 @token_required
+@cache_response("payments:all")
 def get_payments():
     conn=get_db_connection()
     cursor=conn.cursor()
@@ -1101,6 +1386,7 @@ def create_payment():
                    (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"]))
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_payments_cache()
     cursor.close()
     conn.close()
 
@@ -1121,6 +1407,7 @@ def delete_payment(payment_id):
         return jsonify({"error": f"Payment {payment_id} not found"}), 404
 
     conn.commit()
+    invalidate_payments_cache()
     cursor.close()
     conn.close()
 
@@ -1147,6 +1434,7 @@ def update_payment(payment_id):
         return jsonify({"error": f"Payment {payment_id} not found"}), 404
 
     conn.commit()
+    invalidate_payments_cache()
     cursor.close()
     conn.close()
 
@@ -1154,6 +1442,7 @@ def update_payment(payment_id):
 
 @app.route("/equipment")
 @token_required
+@cache_response("equipment:all")
 def get_equipment():
     conn=get_db_connection()
 
@@ -1195,6 +1484,7 @@ def create_equipment():
                    (data["branch_id"], data["name"], data["quantity"], data["condition"]))
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_equipment_cache()
     cursor.close()
     conn.close()
 
@@ -1215,6 +1505,7 @@ def delete_equipment(equipment_id):
         return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
 
     conn.commit()
+    invalidate_equipment_cache()
     cursor.close()
     conn.close()
 
@@ -1241,6 +1532,7 @@ def update_equipment(equipment_id):
         return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
 
     conn.commit()
+    invalidate_equipment_cache()
     cursor.close()
     conn.close()
 
@@ -1248,6 +1540,7 @@ def update_equipment(equipment_id):
 
 @app.route("/trainerbranch")
 @token_required
+@cache_response("trainer_branches:all")
 def get_trainer_branch():
     conn=get_db_connection()
 
@@ -1286,6 +1579,7 @@ def create_trainer_branch():
                    (data["trainer_id"],data["branch_id"])
     )
     conn.commit()
+    invalidate_trainer_branches_cache()
     cursor.close()
     conn.close()
 
@@ -1306,6 +1600,7 @@ def delete_trainer_branch(trainer_id, branch_id):
         return jsonify({"error": f"TrainerBranch trainer_id {trainer_id} branch_id {branch_id} not found"}), 404
 
     conn.commit()
+    invalidate_trainer_branches_cache()
     cursor.close()
     conn.close()
 
@@ -1313,6 +1608,7 @@ def delete_trainer_branch(trainer_id, branch_id):
 
 @app.route("/memberships")
 @token_required
+@cache_response("memberships:all")
 def get_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1360,6 +1656,7 @@ def get_memberships():
 
 @app.route("/membershipplans")
 @token_required
+@cache_response("membership_plans:all")
 def get_membership_plans():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1407,6 +1704,7 @@ def create_membership_plan():
     )
     new_id = cursor.fetchone()[0]
     conn.commit()
+    invalidate_membership_plans_cache()
     cursor.close()
     conn.close()
 
@@ -1427,6 +1725,7 @@ def delete_membership_plan(plan_id):
         return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
 
     conn.commit()
+    invalidate_membership_plans_cache()
     cursor.close()
     conn.close()
 
@@ -1455,6 +1754,7 @@ def update_membership_plan(plan_id):
         return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
 
     conn.commit()
+    invalidate_membership_plans_cache()
     cursor.close()
     conn.close()
 
@@ -1462,6 +1762,7 @@ def update_membership_plan(plan_id):
 
 @app.route("/admins")
 @token_required
+@cache_response("admins:all")
 def get_admins():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -1534,6 +1835,7 @@ def create_admin():
     new_id = cursor.fetchone()[0]
 
     conn.commit()
+    invalidate_admins_cache()
     cursor.close()
     conn.close()
 
@@ -1616,6 +1918,7 @@ def update_admin(admin_id):
         }), 404
 
     conn.commit()
+    invalidate_admins_cache()
     cursor.close()
     conn.close()
 
@@ -1678,6 +1981,7 @@ def delete_admin(admin_id):
     )
 
     conn.commit()
+    invalidate_admins_cache()
 
     cursor.close()
     conn.close()

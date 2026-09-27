@@ -2245,15 +2245,15 @@
 }
 
 html[data-theme="light"] .feedback-message--success {
-  border-color: #abefc6;
-  background: #ecfdf3;
-  color: #067647;
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 html[data-theme="light"] .feedback-message--error {
-  border-color: #fecdca;
-  background: #fff1f0;
-  color: #b42318;
+  border-color: var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 @media (max-width: 480px) {
@@ -2543,7 +2543,7 @@ html[data-theme="light"] .nav-link:hover,
 html[data-theme="light"] .nav-link.active,
 html[data-theme="light"] .mobile-tab-item:hover,
 html[data-theme="light"] .mobile-tab-item:focus-visible {
-  background: #f1eafe;
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -2620,7 +2620,7 @@ html[data-theme="light"] .members-table tr {
 
 html[data-theme="light"] .members-table tr:hover,
 html[data-theme="light"] .member-table-row:focus-visible {
-  background: #f8f5ff;
+  background: var(--accent-soft);
 }
 
 html[data-theme="light"] .members-table .member-table-name,
@@ -2662,29 +2662,29 @@ html[data-theme="light"] .login-button:hover {
 }
 
 html[data-theme="light"] [class$="-danger-button"] {
-  background: #fff1f0;
-  border-color: #fecdca;
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
   color: var(--danger);
 }
 
 html[data-theme="light"] .member-feedback.success,
 html[data-theme="light"] .settings-feedback-success {
-  background: #ecfdf3;
-  border-color: #abefc6;
-  color: #067647;
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
 }
 
 html[data-theme="light"] .member-feedback.error,
 html[data-theme="light"] [class$="-feedback"],
 html[data-theme="light"] .login-error,
 html[data-theme="light"] .member-delete-confirmation {
-  background: #fff1f0;
-  border-color: #fecdca;
-  color: #b42318;
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 
 html[data-theme="light"] .member-delete-confirmation strong {
-  color: #912018;
+  color: var(--danger);
 }
 
 html[data-theme="light"] .mobile-more-overlay,
@@ -2703,7 +2703,7 @@ html[data-theme="light"] .mobile-filter-sheet {
 
 html[data-theme="light"] .mobile-sheet-item:hover,
 html[data-theme="light"] .mobile-sheet-item.active {
-  background: #f1eafe;
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -2760,8 +2760,8 @@ html[data-theme="light"] .mobile-filter-trigger:focus-visible {
 }
 
 html[data-theme="light"] .mobile-filter-trigger.active {
-  background: #f1eafe;
-  border-color: #d6bbfb;
+  background: var(--accent-soft);
+  border-color: var(--border);
   color: var(--accent);
 }
 
@@ -2837,40 +2837,40 @@ html[data-theme="light"] .member-expanded-area {
 html[data-theme="light"] .member-details-button,
 html[data-theme="light"] .edit-action,
 html[data-theme="light"] .member-upload-button {
-  background: #f1eafe;
-  border-color: #d6bbfb;
-  color: #6d28d9;
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 html[data-theme="light"] .delete-action {
-  background: #fff1f0;
-  border-color: #fecdca;
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
   color: var(--danger);
 }
 
 html[data-theme="light"] .membership-status-expired,
 html[data-theme="light"] .class-booking-status-cancelled {
-  background: #fff1f0;
-  border-color: #fecdca;
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
   color: var(--danger);
 }
 
 html[data-theme="light"] .membership-status-expiring-soon {
-  background: #fffaeb;
-  border-color: #fedf89;
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
   color: var(--warning);
 }
 
 html[data-theme="light"] .class-booking-status-completed {
-  background: #f4efff;
-  border-color: #e4d7ff;
-  color: #6d28d9;
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 html[data-theme="light"] .settings-page .branch-total {
-  background: #f4efff !important;
-  border-color: #e4d7ff !important;
-  color: #6d28d9;
+  background: var(--accent-soft) !important;
+  border-color: var(--border) !important;
+  color: var(--accent);
 }
 
 html[data-theme="light"] .settings-page .branch-state h3[style],
@@ -2883,7 +2883,7 @@ html[data-theme="light"] .settings-page .logo-preview-box small[style] {
 }
 
 html[data-theme="light"] .logout-button:hover {
-  background: #fff1f0;
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
@@ -2898,24 +2898,24 @@ html[data-theme="light"] .class-booking-total,
 html[data-theme="light"] .equipment-total,
 html[data-theme="light"] .trainer-branch-total,
 html[data-theme="light"] .admin-total {
-  background: #f4efff;
-  border-color: #e4d7ff;
-  color: #6d28d9;
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 html[data-theme="light"] .member-status,
 html[data-theme="light"] .member-status-badge,
 html[data-theme="light"] .membership-status-active,
 html[data-theme="light"] .class-booking-status-booked {
-  background: #ecfdf3;
-  border-color: #abefc6;
-  color: #067647;
+  background: var(--success-soft);
+  border-color: var(--success-border);
+  color: var(--success);
 }
 
 html[data-theme="light"] .equipment-quantity {
-  background: #f4efff;
-  border-color: #e4d7ff;
-  color: #6d28d9;
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 html[data-theme="light"] .quick-action strong,
