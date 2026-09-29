@@ -18,14 +18,18 @@ def run_migration():
             password=os.getenv("DB_PASSWORD")
         )
 
-    sql_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations", "001_create_gym_table.sql")
-    with open(sql_path, "r", encoding="utf-8") as f:
-        sql = f.read()
-
-    print("Executing migration: 001_create_gym_table.sql ...")
     try:
         cur = conn.cursor()
-        cur.execute(sql)
+        migrations_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations")
+        for migration_name in (
+            "001_create_gym_table.sql",
+            "002_create_password_reset_tokens.sql",
+        ):
+            sql_path = os.path.join(migrations_dir, migration_name)
+            with open(sql_path, "r", encoding="utf-8") as f:
+                sql = f.read()
+            print(f"Executing migration: {migration_name} ...")
+            cur.execute(sql)
         conn.commit()
         print("Migration executed successfully!")
     except Exception as e:
