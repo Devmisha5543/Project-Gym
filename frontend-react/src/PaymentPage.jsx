@@ -4,8 +4,12 @@ import { API_URL } from './config'
 import PaymentList from './PaymentList'
 import PaymentForm from './PaymentForm'
 import { CreditCard, Receipt } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 function PaymentPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const renewalMembershipId = location.state?.renewalMembershipId
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
@@ -76,6 +80,8 @@ function PaymentPage() {
 
       <PaymentForm
         onPaymentCreated={loadPayments}
+        renewalMembershipId={renewalMembershipId}
+        onRenewalComplete={() => navigate('/dashboard', { replace: true })}
       />
 
       {pageError && (

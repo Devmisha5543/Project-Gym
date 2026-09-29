@@ -7,7 +7,8 @@ import {
   Trash2,
   X,
   Save,
-  UserRoundCheck
+  UserRoundCheck,
+  CreditCard
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { API_URL } from './config'
@@ -21,6 +22,7 @@ function MemberDetail({
   membership,
   onMemberUpdated,
   onMemberDeleted,
+  onRenew,
   onFeedback,
   onClose
 }) {
@@ -31,12 +33,16 @@ function MemberDetail({
   const [newPhotoPreview, setNewPhotoPreview] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [photoPreviewOpen, setPhotoPreviewOpen] = useState(false)
 
   useEffect(() => {
     if (!onClose) return undefined
 
     function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        setPhotoPreviewOpen(false)
+        onClose()
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown)
@@ -177,9 +183,15 @@ function MemberDetail({
   return (
     <div className="member-detail-content">
       <div className="member-profile-heading">
-        <div className="member-avatar member-avatar-large">
+        <button
+          type="button"
+          className="member-avatar member-avatar-large member-profile-photo-button"
+          onClick={() => photoUrl && setPhotoPreviewOpen(true)}
+          disabled={!photoUrl}
+          aria-label={`View ${member.name}'s profile photo`}
+        >
           <MemberPhoto key={photoUrl || 'member-profile'} member={member} photoUrl={photoUrl} alt={member.name} />
-        </div>
+        </button>
         <div>
           <span className="member-detail-label">Member profile</span>
           <h4>{editing ? editValues.name : member.name}</h4>
@@ -224,6 +236,9 @@ function MemberDetail({
       )}
 
       <div className="member-expanded-actions">
+        {!editing && membership && getRemainingDays(membership.end_date) < 0 && onRenew && (
+          <button type="button" className="member-action edit-action" onClick={onRenew}><CreditCard size={16} /> Renew</button>
+        )}
         {editing ? (
           <>
             <button type="button" className="member-action edit-action" onClick={saveMember} disabled={saving || !editValues.name || !editValues.phone}><Save size={16} /> Save Changes</button>
@@ -245,6 +260,13 @@ function MemberDetail({
           </div>
         </div>
       )}
+
+      {photoPreviewOpen && (
+        <div className="member-photo-preview" role="dialog" aria-modal="true" aria-label={`${member.name} profile photo`} onClick={() => setPhotoPreviewOpen(false)}>
+          <button type="button" className="member-photo-preview-close" onClick={() => setPhotoPreviewOpen(false)} aria-label="Close photo"><X size={20} /></button>
+          <MemberPhoto key={`large-${photoUrl}`} member={member} photoUrl={photoUrl} alt={member.name} />
+        </div>
+      )}
     </div>
   )
 }
@@ -256,8 +278,8 @@ function MembershipDetails({ membership }) {
     <div className="membership-detail-block">
       <div><CalendarDays size={15} /><span>Membership start<strong>{membership.start_date || 'Not provided'}</strong></span></div>
       <div><CalendarDays size={15} /><span>Membership expiration<strong>{membership.end_date || 'Not provided'}</strong></span></div>
-      <div><UserRoundCheck size={15} /><span>Membership status<strong>{membership.status || 'Not provided'}</strong></span></div>
-      <div><CalendarDays size={15} /><span>Remaining days<strong>{remainingDays === null ? 'Not available' : remainingDays}</strong></span></div>
+      <div><UserRoundCheck size={15} /><span>Membership status<strong>{remainingDays < 0 ? 'Expired' : membership.status || 'Not provided'}</strong></span></div>
+      <div><CalendarDays size={15} /><span>Remaining days<strong>{remainingDays === null ? 'Not available' : remainingDays < 0 ? 'Membership expired' : remainingDays}</strong></span></div>
     </div>
   )
 }

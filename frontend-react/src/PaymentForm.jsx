@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
-function PaymentForm({ onPaymentCreated }) {
+function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete }) {
   const [memberships, setMemberships] = useState([])
   const [membershipId, setMembershipId] = useState('')
   const [amount, setAmount] = useState('')
@@ -34,7 +34,15 @@ function PaymentForm({ onPaymentCreated }) {
         return response.json()
       })
       .then(data => {
-        setMemberships(Array.isArray(data) ? data : [])
+        const availableMemberships = Array.isArray(data) ? data : []
+        setMemberships(availableMemberships)
+        const renewalMembership = availableMemberships.find(membership => (
+          String(membership.membership_id) === String(renewalMembershipId)
+        ))
+        if (renewalMembership) {
+          setMembershipId(String(renewalMembership.membership_id))
+          setAmount(renewalMembership.price)
+        }
       })
       .catch(error => {
         console.error('Failed to load memberships:', error)
@@ -44,7 +52,7 @@ function PaymentForm({ onPaymentCreated }) {
       .finally(() => {
         setLoadingMemberships(false)
       })
-  }, [])
+  }, [renewalMembershipId])
 
   function handleMembershipChange(event) {
     const selectedMembershipId = event.target.value
@@ -98,7 +106,8 @@ function PaymentForm({ onPaymentCreated }) {
       membership_id: membershipId,
       amount,
       payment_date: paymentDate,
-      payment_method: paymentMethod
+      payment_method: paymentMethod,
+      renewal: Boolean(renewalMembershipId)
     }
 
     authFetch(`${API_URL}/payments`, {
@@ -126,8 +135,11 @@ function PaymentForm({ onPaymentCreated }) {
         setPaymentMethod('')
         setErrors({})
 
-        onPaymentCreated()
-        setSuccessMessage('Payment recorded successfully.')
+        if (renewalMembershipId) onRenewalComplete?.()
+        else {
+          onPaymentCreated()
+          setSuccessMessage('Payment recorded successfully.')
+        }
       })
       .catch(error => {
         console.error('Failed to record payment:', error)
@@ -151,10 +163,10 @@ function PaymentForm({ onPaymentCreated }) {
         </div>
 
         <div>
-          <h2>Record Payment</h2>
+          <h2>{renewalMembershipId ? 'Renew Membership' : 'Record Payment'}</h2>
 
           <p>
-            Add a payment to an existing membership.
+            {renewalMembershipId ? 'Record the renewal payment to reactivate this membership.' : 'Add a payment to an existing membership.'}
           </p>
         </div>
 
@@ -189,6 +201,7 @@ function PaymentForm({ onPaymentCreated }) {
                 value={membershipId}
                 onChange={handleMembershipChange}
                 required
+                disabled={Boolean(renewalMembershipId)}
               >
 
                 <option value="">
@@ -198,7 +211,7 @@ function PaymentForm({ onPaymentCreated }) {
                 {memberships
                   .filter(
                     membership =>
-                      membership.status === 'active'
+                      membership.status === 'active' || String(membership.membership_id) === String(renewalMembershipId)
                   )
                   .map(membership => (
 

@@ -934,9 +934,16 @@ def get_expiring_memberships():
         FROM membership
         JOIN member
             ON membership.member_id = member.member_id
-        WHERE membership.end_date >= CURRENT_DATE - INTERVAL '30 days'
-          AND membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
-          AND membership.status = 'active'
+        WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
+          AND membership.status IN ('active', 'expired')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM membership newer
+              WHERE newer.member_id = membership.member_id
+                AND (newer.end_date > membership.end_date
+                     OR (newer.end_date = membership.end_date
+                         AND newer.membership_id > membership.membership_id))
+          )
         ORDER BY membership.end_date ASC;
     """)
 
@@ -1382,11 +1389,29 @@ def create_payment():
     conn=get_db_connection()
 
     cursor=conn.cursor()
+    if data.get("renewal"):
+        cursor.execute(
+            "SELECT membership_id FROM Membership WHERE membership_id = %s AND status IN ('active', 'expired') FOR UPDATE;",
+            (data["membership_id"],)
+        )
+        if not cursor.fetchone():
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Membership cannot be renewed"}), 404
+
     cursor.execute("INSERT INTO Payment (membership_id, amount, payment_date, payment_method) VALUES(%s, %s, %s, %s) RETURNING payment_id;",
                    (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"]))
     new_id = cursor.fetchone()[0]
+    if data.get("renewal"):
+        cursor.execute(
+            "UPDATE Membership SET end_date = GREATEST(end_date, CURRENT_DATE) + 30, status = 'active' WHERE membership_id = %s;",
+            (data["membership_id"],)
+        )
     conn.commit()
-    invalidate_payments_cache()
+    if data.get("renewal"):
+        invalidate_memberships_cache()
+    else:
+        invalidate_payments_cache()
     cursor.close()
     conn.close()
 

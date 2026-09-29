@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { API_URL } from './config'
 import FeedbackMessage from './FeedbackMessage'
 import {authFetch } from './authFetch'
 import { useGym } from './GymContext'
 import MemberDetail from './MemberDetail'
+import MemberPhoto from './MemberPhoto'
 import {
   Activity,
   ArrowUpRight,
@@ -17,7 +19,8 @@ import {
 } from 'lucide-react'
 
 function DashboardPage() {
-  const { gym, loading: gymLoading } = useGym()
+  const navigate = useNavigate()
+  const { gym } = useGym()
   const [expiring, setExpiring] = useState([])
   const [memberCount, setMemberCount] = useState(0)
   const [classCount, setClassCount] = useState(0)
@@ -277,7 +280,7 @@ function DashboardPage() {
             </h2>
 
             <p className="section-description">
-              Members whose memberships expire within the next 7 days.
+              Expired memberships and memberships expiring within the next 7 days.
             </p>
           </div>
 
@@ -332,13 +335,19 @@ function DashboardPage() {
                   key={membership.member_id}
                 >
 
-                  <div className="member-avatar">
-                    {membership.member_name
-                      ? membership.member_name
-                          .charAt(0)
-                          .toUpperCase()
-                      : '?'}
-                  </div>
+                  <button
+                    type="button"
+                    className="member-avatar expiring-avatar"
+                    onClick={() => setSelectedMembership(membership)}
+                    aria-label={`View ${membership.member_name}'s details`}
+                  >
+                    <MemberPhoto
+                      key={membership.photo_filename || `member-${membership.member_id}`}
+                      member={{ ...membership, name: membership.member_name }}
+                      photoUrl={getMemberPhotoUrl(membership.photo_filename)}
+                      alt={membership.member_name}
+                    />
+                  </button>
 
 
                   <div className="member-details">
@@ -371,12 +380,9 @@ function DashboardPage() {
                   </div>
 
 
-                  <span className="expiry-status">
+                  <span className={`expiry-status ${getExpiryStatus(membership.end_date).className}`}>
                     <span className="expiry-status-dot"></span>
-
-                    {membership.status === 'no_membership'
-                      ? 'No active membership'
-                      : 'Due soon'}
+                    {getExpiryStatus(membership.end_date).label}
                   </span>
 
 
@@ -417,6 +423,7 @@ function DashboardPage() {
               membership={selectedMembership}
               onMemberUpdated={updatedMember => setSelectedMembership(current => ({ ...current, ...updatedMember }))}
               onMemberDeleted={() => setSelectedMembership(null)}
+              onRenew={() => navigate('/payments', { state: { renewalMembershipId: selectedMembership.membership_id } })}
               onClose={() => setSelectedMembership(null)}
             />
           </div>
@@ -425,6 +432,28 @@ function DashboardPage() {
 
     </div>
   )
+}
+
+function getMemberPhotoUrl(photo) {
+  if (!photo) return null
+  if (/^(https?:|data:|blob:)/i.test(photo)) return photo
+  if (photo.startsWith('/')) return `${API_URL}${photo}`
+  return `${API_URL}/uploads/${encodeURIComponent(photo)}`
+}
+
+function getExpiryStatus(endDate) {
+  if (!endDate) return { label: 'Date unavailable', className: '' }
+
+  const [year, month, day] = endDate.split('-').map(Number)
+  const today = new Date()
+  const daysRemaining = Math.ceil((
+    Date.UTC(year, month - 1, day) -
+    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  ) / 86400000)
+
+  if (daysRemaining < 0) return { label: 'Membership expired', className: 'expiry-status-expired' }
+  if (daysRemaining <= 3) return { label: 'Due soon', className: 'expiry-status-soon' }
+  return { label: '1 week left', className: 'expiry-status-week' }
 }
 
 export default DashboardPage
