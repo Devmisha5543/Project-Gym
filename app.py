@@ -408,15 +408,17 @@ def get_authenticated_gym_id(conn=None):
         conn = get_db_connection()
         should_close = True
 
+    cursor = None
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT gym_id FROM Admin WHERE admin_id = %s;", (admin_id,))
         row = cursor.fetchone()
-        cursor.close()
         if row and row[0] is not None:
             return row[0]
         return None
     finally:
+        if cursor:
+            cursor.close()
         if should_close:
             conn.close()
 
@@ -440,11 +442,12 @@ def is_valid_member_photo(file):
 @app.route("/gym", methods=["GET"])
 @token_required
 def get_gym():
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         gym_id = get_authenticated_gym_id(conn)
         if not gym_id:
-            conn.close()
             return jsonify({"error": "Gym not found"}), 404
 
         cursor = conn.cursor()
@@ -453,8 +456,6 @@ def get_gym():
             (gym_id,)
         )
         row = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
         if not row:
             return jsonify({"error": "Gym not found"}), 404
@@ -471,6 +472,11 @@ def get_gym():
         }), 200
     except Exception as e:
         return jsonify({"error": "Failed to retrieve gym details"}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @app.route("/gym", methods=["PUT"])
 @token_required
@@ -483,11 +489,12 @@ def update_gym():
     if "name" in data and (data["name"] is None or not str(data["name"]).strip()):
         return jsonify({"error": "Gym name cannot be empty"}), 400
 
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         gym_id = get_authenticated_gym_id(conn)
         if not gym_id:
-            conn.close()
             return jsonify({"error": "Gym not found"}), 404
 
         cursor = conn.cursor()
@@ -497,8 +504,6 @@ def update_gym():
         )
         existing = cursor.fetchone()
         if not existing:
-            cursor.close()
-            conn.close()
             return jsonify({"error": "Gym not found"}), 404
 
         name = data.get("name", existing[1])
@@ -519,8 +524,6 @@ def update_gym():
         )
         updated = cursor.fetchone()
         conn.commit()
-        cursor.close()
-        conn.close()
 
         gym_data = {
             "gym_id": updated[0],
@@ -539,7 +542,14 @@ def update_gym():
             **gym_data
         }), 200
     except Exception as e:
+        if conn:
+            conn.rollback()
         return jsonify({"error": "Failed to update gym details"}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 @app.route("/uploads/<filename>")
 @token_required
@@ -558,21 +568,21 @@ def home():
 def db_check():
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT current_database(), current_schema();")
+        db_name, schema = cursor.fetchone()
 
-    cursor.execute("SELECT current_database(), current_schema();")
-    db_name, schema = cursor.fetchone()
-
-    cursor.execute("""
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = 'admin'
-          AND column_name = 'gym_id';
-    """)
-    gym_column = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
+        cursor.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'admin'
+              AND column_name = 'gym_id';
+        """)
+        gym_column = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
 
     return jsonify({
         "database": db_name,
@@ -586,10 +596,12 @@ def db_check():
 def get_branches():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT branch_id, name, address, phone, city FROM branch;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute("SELECT branch_id, name, address, phone, city FROM branch;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     branches = []
     for row in rows:
@@ -616,18 +628,23 @@ def create_branch():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO Branch (name, address, phone, city) VALUES(%s, %s, %s, %s) RETURNING branch_id;",
+            (data["name"], data["address"], data["phone"], data["city"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO Branch (name, address, phone, city) VALUES(%s, %s, %s, %s)RETURNING branch_id;",
-                   (data["name"], data["address"], data["phone"], data["city"])
-    )
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_branches_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Branch created", "branch_id": new_id}), 201
 
 @app.route("/branches/<int:branch_id>", methods=["DELETE"])
@@ -682,23 +699,27 @@ def update_branch(branch_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Branch SET name = %s, address = %s, phone = %s, city=%s WHERE branch_id = %s;",
+            (data["name"], data["address"], data["phone"], data["city"], branch_id)
+        )
 
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Branch SET name = %s, address = %s, phone = %s, city=%s WHERE branch_id = %s;",
-                   (data["name"], data["address"], data["phone"], data["city"], branch_id))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Branch {branch_id} not found"}), 404
 
-    if cursor.rowcount == 0:
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Branch {branch_id} not found"}), 404
 
-    conn.commit()
     invalidate_branches_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Branch {branch_id} updated"}), 200
 
 @app.route("/members")
@@ -718,17 +739,17 @@ def get_members():
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT member_id, branch_id, name, gender, phone, address,
+                   join_date, wants_trainer, photo_filename
+            FROM member;
+        """)
 
-    cursor.execute("""
-        SELECT member_id, branch_id, name, gender, phone, address,
-               join_date, wants_trainer, photo_filename
-        FROM member;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     members = []
 
@@ -867,25 +888,23 @@ def delete_member(member_id):
             "DELETE FROM Member WHERE member_id = %s;",
             (member_id,)
         )
+
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({
+                "error": f"Member {member_id} not found"
+            }), 404
+
+        conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This member cannot be deleted while memberships, bookings, or assignments still reference them."}), 409
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-
-        return jsonify({
-            "error": f"Member {member_id} not found"
-        }), 404
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
 
     # Invalidate cached member list after successful deletion
     invalidate_members_cache()
@@ -949,101 +968,96 @@ def update_member(member_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        if not is_multipart:
+            cursor.execute(
+                """
+                UPDATE Member
+                SET name = %s, phone = %s
+                WHERE member_id = %s;
+                """,
+                (
+                    data["name"],
+                    data["phone"],
+                    member_id
+                )
+            )
+        elif photo_filename:
+            cursor.execute(
+                """
+                UPDATE Member
+                SET branch_id = %s,
+                    name = %s,
+                    gender = %s,
+                    phone = %s,
+                    address = %s,
+                    join_date = %s,
+                    wants_trainer = %s,
+                    photo_filename = %s
+                WHERE member_id = %s;
+                """,
+                (
+                    data["branch_id"],
+                    data["name"],
+                    data["gender"],
+                    data["phone"],
+                    data["address"],
+                    data["join_date"],
+                    str(data["wants_trainer"]).lower() == "true",
+                    photo_filename,
+                    member_id
+                )
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE Member
+                SET branch_id = %s,
+                    name = %s,
+                    gender = %s,
+                    phone = %s,
+                    address = %s,
+                    join_date = %s,
+                    wants_trainer = %s
+                WHERE member_id = %s;
+                """,
+                (
+                    data["branch_id"],
+                    data["name"],
+                    data["gender"],
+                    data["phone"],
+                    data["address"],
+                    data["join_date"],
+                    str(data["wants_trainer"]).lower() == "true",
+                    member_id
+                )
+            )
 
-    if not is_multipart:
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({
+                "error": f"Member {member_id} not found"
+            }), 404
+
+        conn.commit()
 
         cursor.execute(
             """
-            UPDATE Member
-            SET name = %s, phone = %s
+            SELECT member_id, branch_id, name, gender, phone, address,
+                   join_date, wants_trainer, photo_filename
+            FROM member
             WHERE member_id = %s;
             """,
-            (
-                data["name"],
-                data["phone"],
-                member_id
-            )
+            (member_id,)
         )
 
-    elif photo_filename:
-
-        cursor.execute(
-            """
-            UPDATE Member
-            SET branch_id = %s,
-                name = %s,
-                gender = %s,
-                phone = %s,
-                address = %s,
-                join_date = %s,
-                wants_trainer = %s,
-                photo_filename = %s
-            WHERE member_id = %s;
-            """,
-            (
-                data["branch_id"],
-                data["name"],
-                data["gender"],
-                data["phone"],
-                data["address"],
-                data["join_date"],
-                str(data["wants_trainer"]).lower() == "true",
-                photo_filename,
-                member_id
-            )
-        )
-
-    else:
-
-        cursor.execute(
-            """
-            UPDATE Member
-            SET branch_id = %s,
-                name = %s,
-                gender = %s,
-                phone = %s,
-                address = %s,
-                join_date = %s,
-                wants_trainer = %s
-            WHERE member_id = %s;
-            """,
-            (
-                data["branch_id"],
-                data["name"],
-                data["gender"],
-                data["phone"],
-                data["address"],
-                data["join_date"],
-                str(data["wants_trainer"]).lower() == "true",
-                member_id
-            )
-        )
-
-    if cursor.rowcount == 0:
+        row = cursor.fetchone()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-
-        return jsonify({
-            "error": f"Member {member_id} not found"
-        }), 404
-
-    conn.commit()
-
-    cursor.execute(
-        """
-        SELECT member_id, branch_id, name, gender, phone, address,
-               join_date, wants_trainer, photo_filename
-        FROM member
-        WHERE member_id = %s;
-        """,
-        (member_id,)
-    )
-
-    row = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
 
     # Invalidate cached member list after successful update
     invalidate_members_cache()
@@ -1069,17 +1083,18 @@ def update_member(member_id):
 @token_required
 @cache_response("trainers:all")
 def get_trainers():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("""
-    SELECT trainer_id, name, phone, email, certification
-    FROM trainer
-    ORDER BY trainer_id ASC;
-    """)
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        SELECT trainer_id, name, phone, email, certification
+        FROM trainer
+        ORDER BY trainer_id ASC;
+        """)
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     trainers = []
 
@@ -1108,46 +1123,47 @@ def create_trainer():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn =get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO Trainer (name, phone, email, certification) VALUES(%s, %s, %s, %s) RETURNING trainer_id;",
+            (data["name"], data["phone"], data["email"], data["certification"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO Trainer (name, phone, email, certification) VALUES(%s, %s, %s, %s) RETURNING trainer_id;",
-                  (  data["name"], data["phone"], data["email"], data["certification"])
-    )
-
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_trainers_cache()
-    cursor.close()
-    conn.close()
-    
     return jsonify({"message": "Trainer created", "trainer_id": new_id}), 201
 
 @app.route("/trainers/<int:trainer_id>", methods=["DELETE"])
 @token_required
 def delete_trainer(trainer_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM Trainer WHERE trainer_id = %s;", (trainer_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
+        conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This trainer cannot be deleted while classes, branch links, or assignments still reference them."}), 409
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
 
-    conn.commit()
     invalidate_trainers_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Trainer {trainer_id} deleted"}), 200
 
 @app.route("/trainers/<int:trainer_id>", methods=["PUT"])
@@ -1158,23 +1174,25 @@ def update_trainer(trainer_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Trainer SET name = %s, phone = %s, email = %s, certification = %s WHERE trainer_id = %s",
-                 (data["name"], data["phone"], data["email"], data["certification"], trainer_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Trainer SET name = %s, phone = %s, email = %s, certification = %s WHERE trainer_id = %s",
+            (data["name"], data["phone"], data["email"], data["certification"], trainer_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
 
-    conn.commit()
     invalidate_trainers_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Trainer {trainer_id} updated"}), 200
 
 
@@ -1185,42 +1203,42 @@ def update_trainer(trainer_id):
 def get_expiring_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT
+                membership.membership_id,
+                member.member_id,
+                member.branch_id,
+                member.name,
+                member.gender,
+                member.phone,
+                member.address,
+                member.join_date,
+                member.wants_trainer,
+                member.photo_filename,
+                membership.start_date,
+                membership.end_date,
+                membership.status
+            FROM membership
+            JOIN member
+                ON membership.member_id = member.member_id
+            WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
+              AND membership.status IN ('active', 'expired')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM membership newer
+                  WHERE newer.member_id = membership.member_id
+                    AND (newer.end_date > membership.end_date
+                         OR (newer.end_date = membership.end_date
+                             AND newer.membership_id > membership.membership_id))
+              )
+            ORDER BY membership.end_date ASC;
+        """)
 
-    cursor.execute("""
-        SELECT
-            membership.membership_id,
-            member.member_id,
-            member.branch_id,
-            member.name,
-            member.gender,
-            member.phone,
-            member.address,
-            member.join_date,
-            member.wants_trainer,
-            member.photo_filename,
-            membership.start_date,
-            membership.end_date,
-            membership.status
-        FROM membership
-        JOIN member
-            ON membership.member_id = member.member_id
-        WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
-          AND membership.status IN ('active', 'expired')
-          AND NOT EXISTS (
-              SELECT 1
-              FROM membership newer
-              WHERE newer.member_id = membership.member_id
-                AND (newer.end_date > membership.end_date
-                     OR (newer.end_date = membership.end_date
-                         AND newer.membership_id > membership.membership_id))
-          )
-        ORDER BY membership.end_date ASC;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     expiring = []
 
@@ -1258,86 +1276,90 @@ def create_membership():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO Membership (member_id, plan_id, start_date, end_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING membership_id;",
+            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO Membership (member_id, plan_id, start_date, end_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING membership_id;",
-                   (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"] ))
-    
-
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_memberships_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Membership created", "membership_id": new_id}), 201
 
 @app.route("/memberships/<int:membership_id>", methods=["DELETE"])
 @token_required
 def delete_membership(membership_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM Membership WHERE membership_id = %s;", (membership_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Membership {membership_id} not found"}), 404
+        conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This membership cannot be deleted while payments still reference it."}), 409
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Membership {membership_id} not found"}), 404
 
-    conn.commit()
     invalidate_memberships_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Membership {membership_id} deleted"}), 200
 
 @app.route("/memberships/<int:membership_id>", methods=["PUT"])
 @token_required
 def update_membership(membership_id):
-    data=request.json
+    data = request.json
 
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s WHERE membership_id = %s;",
-                   (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"], membership_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s WHERE membership_id = %s;",
+            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"], membership_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Membership {membership_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Membership {membership_id} not found"}), 404
 
-    conn.commit()
     invalidate_memberships_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Membership {membership_id} updated"}), 200
 
 @app.route("/personaltrainingassignments")
 @token_required
 @cache_response("personal_training_assignments:all")
 def get_personal_trainer_assignments():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("SELECT assignment_id, trainer_id, member_id, speciality, start_date, status FROM personaltrainingassignment;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT assignment_id, trainer_id, member_id, speciality, start_date, status FROM personaltrainingassignment;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     assignments = []
     for row in rows:
@@ -1365,39 +1387,44 @@ def create_personal_trainer_assignment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO PersonalTrainingAssignment (trainer_id, member_id, speciality, start_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING assignment_id;",
+            (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO PersonalTrainingAssignment (trainer_id, member_id, speciality, start_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING assignment_id;",
-                   (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"]))
-
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_personal_training_assignments_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Personal trainer assignment created", "assignment_id": new_id}), 201
 
 @app.route("/personaltrainingassignments/<int:assignment_id>", methods=["DELETE"])
 @token_required
 def delete_personal_trainer_assignment(assignment_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM PersonalTrainingAssignment WHERE assignment_id = %s;", (assignment_id,))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM PersonalTrainingAssignment WHERE assignment_id = %s;", (assignment_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
 
-    conn.commit()
     invalidate_personal_training_assignments_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Personal trainer assignment {assignment_id} deleted"}), 200
 
 @app.route("/personaltrainingassignments/<int:assignment_id>", methods=["PUT"])
@@ -1408,36 +1435,39 @@ def update_personal_trainer_assignment(assignment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE PersonalTrainingAssignment SET trainer_id = %s, member_id = %s, speciality = %s, start_date = %s, status = %s WHERE assignment_id = %s;",
-                   (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"], assignment_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE PersonalTrainingAssignment SET trainer_id = %s, member_id = %s, speciality = %s, start_date = %s, status = %s WHERE assignment_id = %s;",
+            (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"], assignment_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
 
-    conn.commit()
     invalidate_personal_training_assignments_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Personal trainer assignment {assignment_id} updated"}), 200
 
 @app.route("/classbookings")
 @token_required
 @cache_response("class_bookings:all")
 def get_class_bookings():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("SELECT booking_id, member_id, class_id, booking_date, cancel_date, status FROM classbooking;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT booking_id, member_id, class_id, booking_date, cancel_date, status FROM classbooking;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     bookings = []
     for row in rows:
@@ -1465,38 +1495,44 @@ def create_class_booking():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO ClassBooking (member_id, class_id, booking_date, cancel_date, status) VALUES(%s,%s, %s, %s, %s) RETURNING booking_id;",
+            (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO ClassBooking (member_id, class_id, booking_date, cancel_date, status) VALUES(%s,%s, %s, %s, %s) RETURNING booking_id;",
-                   (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"]))
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_class_bookings_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Class booking created", "booking_id": new_id}), 201
 
 @app.route("/classbookings/<int:booking_id>", methods=["DELETE"])
 @token_required
 def delete_class_booking(booking_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM ClassBooking WHERE booking_id = %s;", (booking_id,))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM ClassBooking WHERE booking_id = %s;", (booking_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
 
-    conn.commit()
     invalidate_class_bookings_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Class booking {booking_id} deleted"}), 200
 
 @app.route("/classbookings/<int:booking_id>", methods=["PUT"])
@@ -1507,36 +1543,39 @@ def update_class_booking(booking_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE ClassBooking SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s WHERE booking_id = %s;",
-                   (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"], booking_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE ClassBooking SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s WHERE booking_id = %s;",
+            (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"], booking_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
 
-    conn.commit()
     invalidate_class_bookings_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Class booking {booking_id} updated"}), 200
 
 @app.route("/classes")
 @token_required
 @cache_response("classes:all")
 def get_classes():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("SELECT class_id, trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity FROM class;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT class_id, trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity FROM class;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     classes = []
     for row in rows:
@@ -1565,44 +1604,47 @@ def create_class():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO Class (trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity) VALUES(%s, %s, %s, %s, %s, %s) RETURNING class_id;",
+            (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO Class (trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity) VALUES(%s, %s, %s, %s, %s, %s) RETURNING class_id;",
-                   (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"]))
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_classes_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Class created", "class_id": new_id}), 201
 
 @app.route("/classes/<int:class_id>", methods=["DELETE"])
 @token_required
 def delete_class(class_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM Class WHERE class_id = %s;", (class_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Class {class_id} not found"}), 404
+        conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This class cannot be deleted while bookings still reference it."}), 409
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Class {class_id} not found"}), 404
 
-    conn.commit()
     invalidate_classes_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Class {class_id} deleted"}), 200
 
 @app.route("/classes/<int:class_id>", methods=["PUT"])
@@ -1613,35 +1655,39 @@ def update_class(class_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Class SET trainer_id = %s, branch_id = %s, class_name = %s, schedule_time = %s, duration_minutes = %s, capacity = %s WHERE class_id = %s;",
-                   (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"], class_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Class SET trainer_id = %s, branch_id = %s, class_name = %s, schedule_time = %s, duration_minutes = %s, capacity = %s WHERE class_id = %s;",
+            (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"], class_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Class {class_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Class {class_id} not found"}), 404
 
-    conn.commit()
     invalidate_classes_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Class {class_id} updated"}), 200
 
 @app.route("/payments")
 @token_required
 @cache_response("payments:all")
 def get_payments():
-    conn=get_db_connection()
-    cursor=conn.cursor()
-    cursor.execute("SELECT payment_id, membership_id, amount, payment_date, payment_method FROM payment;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT payment_id, membership_id, amount, payment_date, payment_method FROM payment;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     payments = []
     for row in rows:
@@ -1668,56 +1714,62 @@ def create_payment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if data.get("renewal"):
+            cursor.execute(
+                "SELECT membership_id FROM Membership WHERE membership_id = %s AND status IN ('active', 'expired') FOR UPDATE;",
+                (data["membership_id"],)
+            )
+            if not cursor.fetchone():
+                conn.rollback()
+                return jsonify({"error": "Membership cannot be renewed"}), 404
 
-    cursor=conn.cursor()
-    if data.get("renewal"):
         cursor.execute(
-            "SELECT membership_id FROM Membership WHERE membership_id = %s AND status IN ('active', 'expired') FOR UPDATE;",
-            (data["membership_id"],)
+            "INSERT INTO Payment (membership_id, amount, payment_date, payment_method) VALUES(%s, %s, %s, %s) RETURNING payment_id;",
+            (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"])
         )
-        if not cursor.fetchone():
-            cursor.close()
-            conn.close()
-            return jsonify({"error": "Membership cannot be renewed"}), 404
+        new_id = cursor.fetchone()[0]
+        if data.get("renewal"):
+            cursor.execute(
+                "UPDATE Membership SET end_date = GREATEST(end_date, CURRENT_DATE) + 30, status = 'active' WHERE membership_id = %s;",
+                (data["membership_id"],)
+            )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor.execute("INSERT INTO Payment (membership_id, amount, payment_date, payment_method) VALUES(%s, %s, %s, %s) RETURNING payment_id;",
-                   (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"]))
-    new_id = cursor.fetchone()[0]
-    if data.get("renewal"):
-        cursor.execute(
-            "UPDATE Membership SET end_date = GREATEST(end_date, CURRENT_DATE) + 30, status = 'active' WHERE membership_id = %s;",
-            (data["membership_id"],)
-        )
-    conn.commit()
     if data.get("renewal"):
         invalidate_memberships_cache()
     else:
         invalidate_payments_cache()
-    cursor.close()
-    conn.close()
 
     return jsonify({"message": "Payment created", "payment_id": new_id}), 201
 
 @app.route("/payments/<int:payment_id>", methods=["DELETE"])
 @token_required
 def delete_payment(payment_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM Payment WHERE payment_id = %s;", (payment_id,))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM Payment WHERE payment_id = %s;", (payment_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Payment {payment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Payment {payment_id} not found"}), 404
 
-    conn.commit()
     invalidate_payments_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Payment {payment_id} deleted"}), 200
 
 @app.route("/payments/<int:payment_id>", methods=["PUT"])
@@ -1728,36 +1780,39 @@ def update_payment(payment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Payment SET membership_id = %s, amount = %s, payment_date = %s, payment_method = %s WHERE payment_id = %s;",
-                   (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"], payment_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Payment SET membership_id = %s, amount = %s, payment_date = %s, payment_method = %s WHERE payment_id = %s;",
+            (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"], payment_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Payment {payment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Payment {payment_id} not found"}), 404
 
-    conn.commit()
     invalidate_payments_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Payment {payment_id} updated"}), 200
 
 @app.route("/equipment")
 @token_required
 @cache_response("equipment:all")
 def get_equipment():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("SELECT equipment_id, branch_id, name, quantity, condition FROM equipment;")
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT equipment_id, branch_id, name, quantity, condition FROM equipment;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     equipment_list = []
     for row in rows:
@@ -1784,38 +1839,44 @@ def create_equipment():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO Equipment (branch_id, name, quantity, condition) VALUES(%s, %s, %s, %s) RETURNING equipment_id;",
+            (data["branch_id"], data["name"], data["quantity"], data["condition"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    cursor=conn.cursor()
-    cursor.execute("INSERT INTO Equipment (branch_id, name, quantity, condition) VALUES(%s, %s, %s, %s) RETURNING equipment_id;",
-                   (data["branch_id"], data["name"], data["quantity"], data["condition"]))
-    new_id = cursor.fetchone()[0]
-    conn.commit()
     invalidate_equipment_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": "Equipment created", "equipment_id": new_id}), 201
 
 @app.route("/equipment/<int:equipment_id>", methods=["DELETE"])
 @token_required
 def delete_equipment(equipment_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM Equipment WHERE equipment_id = %s;", (equipment_id,))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM Equipment WHERE equipment_id = %s;", (equipment_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
 
-    conn.commit()
     invalidate_equipment_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Equipment {equipment_id} deleted"}), 200
 
 @app.route("/equipment/<int:equipment_id>", methods=["PUT"])
@@ -1826,36 +1887,39 @@ def update_equipment(equipment_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("UPDATE Equipment SET branch_id = %s, name = %s, quantity = %s, condition = %s WHERE equipment_id = %s;",
-                   (data["branch_id"], data["name"], data["quantity"], data["condition"], equipment_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE Equipment SET branch_id = %s, name = %s, quantity = %s, condition = %s WHERE equipment_id = %s;",
+            (data["branch_id"], data["name"], data["quantity"], data["condition"], equipment_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
 
-    conn.commit()
     invalidate_equipment_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Equipment {equipment_id} updated"}), 200
 
 @app.route("/trainerbranch")
 @token_required
 @cache_response("trainer_branches:all")
 def get_trainer_branch():
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("SELECT trainer_id,branch_id FROM trainerbranch;")
-    rows= cursor.fetchall()
-    cursor.close()
-    conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT trainer_id,branch_id FROM trainerbranch;")
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     trainer_branch = []
     for row in rows:
@@ -1879,27 +1943,28 @@ def create_trainer_branch():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
-                       (data["trainer_id"],data["branch_id"]))
+        cursor.execute(
+            "INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
+            (data["trainer_id"], data["branch_id"])
+        )
+        conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This trainer is already linked to that branch."}), 409
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
+        return jsonify({"error": "Select an existing trainer and branch."}), 404
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": "Select an existing trainer and branch."}), 404
-    conn.commit()
-    invalidate_trainer_branches_cache()
-    cursor.close()
-    conn.close()
 
+    invalidate_trainer_branches_cache()
     return jsonify({"message": "Trainer-Branch relationship created"}), 201
 
 @app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["PUT"])
@@ -1916,48 +1981,45 @@ def update_trainer_branch(trainer_id, branch_id):
             "UPDATE TrainerBranch SET trainer_id = %s, branch_id = %s WHERE trainer_id = %s AND branch_id = %s;",
             (data["trainer_id"], data["branch_id"], trainer_id, branch_id)
         )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": "Trainer branch link not found."}), 404
+        conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This trainer is already linked to that branch."}), 409
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "Select an existing trainer and branch."}), 404
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": "Trainer branch link not found."}), 404
 
-    conn.commit()
     invalidate_trainer_branches_cache()
-    cursor.close()
-    conn.close()
     return jsonify({"message": "Trainer-Branch relationship updated"}), 200
 
 @app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["DELETE"])
 @token_required
 def delete_trainer_branch(trainer_id, branch_id):
-    conn=get_db_connection()
-
-    cursor=conn.cursor()
-    cursor.execute("DELETE FROM TrainerBranch WHERE trainer_id = %s AND branch_id = %s;", (trainer_id, branch_id))
-
-    if cursor.rowcount == 0:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM TrainerBranch WHERE trainer_id = %s AND branch_id = %s;", (trainer_id, branch_id))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"TrainerBranch trainer_id {trainer_id} branch_id {branch_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"TrainerBranch trainer_id {trainer_id} branch_id {branch_id} not found"}), 404
 
-    conn.commit()
     invalidate_trainer_branches_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"Trainer-Branch relationship deleted for trainer {trainer_id} and branch {branch_id}"}), 200
 
 @app.route("/memberships")
@@ -1966,30 +2028,30 @@ def delete_trainer_branch(trainer_id, branch_id):
 def get_memberships():
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT
+                m.membership_id,
+                m.member_id,
+                mem.name AS member_name,
+                m.plan_id,
+                mp.plan_name,
+                mp.price,
+                m.start_date,
+                m.end_date,
+                m.status
+            FROM membership m
+            JOIN member mem
+                ON m.member_id = mem.member_id
+            JOIN membershipplan mp
+                ON m.plan_id = mp.plan_id
+            ORDER BY m.membership_id;
+        """)
 
-    cursor.execute("""
-        SELECT
-            m.membership_id,
-            m.member_id,
-            mem.name AS member_name,
-            m.plan_id,
-            mp.plan_name,
-            mp.price,
-            m.start_date,
-            m.end_date,
-            m.status
-        FROM membership m
-        JOIN member mem
-            ON m.member_id = mem.member_id
-        JOIN membershipplan mp
-            ON m.plan_id = mp.plan_id
-        ORDER BY m.membership_id;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     memberships = []
 
@@ -2014,16 +2076,16 @@ def get_memberships():
 def get_membership_plans():
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT plan_id, plan_name, price, perks
+            FROM membershipplan;
+        """)
 
-    cursor.execute("""
-        SELECT plan_id, plan_name, price, perks
-        FROM membershipplan;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     plans = []
 
@@ -2082,11 +2144,15 @@ def _analytics_cache_key(metric):
 
 def _analytics_connection():
     conn = get_db_connection()
-    gym_id = get_authenticated_gym_id(conn)
-    if not gym_id:
+    try:
+        gym_id = get_authenticated_gym_id(conn)
+        if not gym_id:
+            conn.close()
+            return None, None
+        return conn, gym_id
+    except Exception:
         conn.close()
-        return None, None
-    return conn, gym_id
+        raise
 
 
 @app.route("/analytics/overview")
@@ -2101,47 +2167,49 @@ def analytics_overview():
     if not conn:
         return jsonify({"error": "Authenticated gym not found."}), 403
     cursor = conn.cursor()
-    today = datetime.date.today()
-    month_start = today.replace(day=1)
-    previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
-    cursor.execute("""
-        WITH latest AS (
-            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
-            FROM membership ms
-            JOIN member m ON m.member_id = ms.member_id
-            JOIN branch b ON b.branch_id = m.branch_id
-            WHERE b.gym_id = %s
-            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
-        )
-        SELECT COUNT(*),
-               COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
-               COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
-               COUNT(*) FILTER (WHERE l.status = 'cancelled'),
-               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
-               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
-               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
-               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
-        FROM member m
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        LEFT JOIN latest l ON l.member_id = m.member_id;
-    """, (gym_id, start, end, previous_start, start, month_start, today + datetime.timedelta(days=1),
-          previous_month_start, month_start, gym_id))
-    total, active, expired, cancelled, new_members, previous_new, new_this_month, new_previous_month = cursor.fetchone()
-    cursor.execute("""
-        SELECT COALESCE(SUM(p.amount), 0),
-               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
-               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
-               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
-               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
+    try:
+        today = datetime.date.today()
+        month_start = today.replace(day=1)
+        previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
+        cursor.execute("""
+            WITH latest AS (
+                SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+                FROM membership ms
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch b ON b.branch_id = m.branch_id
+                WHERE b.gym_id = %s
+                ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+            )
+            SELECT COUNT(*),
+                   COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+                   COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+                   COUNT(*) FILTER (WHERE l.status = 'cancelled'),
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
+            FROM member m
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            LEFT JOIN latest l ON l.member_id = m.member_id;
+        """, (gym_id, start, end, previous_start, start, month_start, today + datetime.timedelta(days=1),
+              previous_month_start, month_start, gym_id))
+        total, active, expired, cancelled, new_members, previous_new, new_this_month, new_previous_month = cursor.fetchone()
+        cursor.execute("""
+            SELECT COALESCE(SUM(p.amount), 0),
+                   COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+                   COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+                   COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+                   COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
         FROM payment p
         JOIN membership ms ON ms.membership_id = p.membership_id
         JOIN member m ON m.member_id = ms.member_id
         JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s;
     """, (start, end, previous_start, start, month_start, today + datetime.timedelta(days=1),
           previous_month_start, month_start, gym_id))
-    lifetime_revenue, revenue, previous_revenue, revenue_this_month, revenue_previous_month = cursor.fetchone()
-    cursor.close()
-    conn.close()
+        lifetime_revenue, revenue, previous_revenue, revenue_this_month, revenue_previous_month = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
     growth = new_members - previous_new
     return jsonify({
         "range": {"start_date": start.isoformat(), "end_date": (end - datetime.timedelta(days=1)).isoformat()},
@@ -2187,27 +2255,29 @@ def analytics_retention():
     if not conn:
         return jsonify({"error": "Authenticated gym not found."}), 403
     cursor = conn.cursor()
-    cursor.execute("""
-        WITH latest AS (
-            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
-            FROM membership ms
-            JOIN member m ON m.member_id = ms.member_id
-            JOIN branch b ON b.branch_id = m.branch_id
-            WHERE b.gym_id = %s
-            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
-        )
-        SELECT COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
-               COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
-               COUNT(*) FILTER (WHERE l.status = 'cancelled'),
-               COUNT(*) FILTER (WHERE l.member_id IS NULL),
-               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
-        FROM member m
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        LEFT JOIN latest l ON l.member_id = m.member_id;
-    """, (gym_id, start, end, gym_id))
-    active, expired, cancelled, no_membership, new_members = cursor.fetchone()
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute("""
+            WITH latest AS (
+                SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+                FROM membership ms
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch b ON b.branch_id = m.branch_id
+                WHERE b.gym_id = %s
+                ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+            )
+            SELECT COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+                   COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+                   COUNT(*) FILTER (WHERE l.status = 'cancelled'),
+                   COUNT(*) FILTER (WHERE l.member_id IS NULL),
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
+            FROM member m
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            LEFT JOIN latest l ON l.member_id = m.member_id;
+        """, (gym_id, start, end, gym_id))
+        active, expired, cancelled, no_membership, new_members = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
     return jsonify({
         "current_active_memberships": active,
         "current_expired_memberships": expired,
@@ -2234,82 +2304,84 @@ def analytics_financial():
     if not conn:
         return jsonify({"error": "Authenticated gym not found."}), 403
     cursor = conn.cursor()
-    today = datetime.date.today()
-    month_start = today.replace(day=1)
-    previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
-    cursor.execute("""
-        SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE p.payment_date >= %s AND p.payment_date < %s;
-    """, (gym_id, start, end))
-    revenue, paying_members = cursor.fetchone()
-    cursor.execute("""
-        SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE p.payment_date >= %s AND p.payment_date < %s;
-    """, (gym_id, previous_start, start))
-    previous_revenue = cursor.fetchone()[0]
-    cursor.execute("""
-        SELECT COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
-               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE p.payment_date >= %s AND p.payment_date < %s;
-    """, (month_start, today + datetime.timedelta(days=1), previous_month_start, month_start,
-          gym_id, previous_month_start, today + datetime.timedelta(days=1)))
-    revenue_this_month, revenue_previous_month = cursor.fetchone()
-    grain = "day" if (end - start).days <= 45 else "month"
-    date_format = "YYYY-MM-DD" if grain == "day" else "YYYY-MM"
-    cursor.execute("""
-        WITH buckets AS (
-            SELECT generate_series(date_trunc(%s, %s::timestamp),
-                                   date_trunc(%s, (%s::date - 1)),
-                                   CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
-        ), totals AS (
-            SELECT date_trunc(%s, p.payment_date) AS bucket, SUM(p.amount) AS revenue
+    try:
+        today = datetime.date.today()
+        month_start = today.replace(day=1)
+        previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
+        cursor.execute("""
+            SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s;
+        """, (gym_id, start, end))
+        revenue, paying_members = cursor.fetchone()
+        cursor.execute("""
+            SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s;
+        """, (gym_id, previous_start, start))
+        previous_revenue = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+                   COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s;
+        """, (month_start, today + datetime.timedelta(days=1), previous_month_start, month_start,
+              gym_id, previous_month_start, today + datetime.timedelta(days=1)))
+        revenue_this_month, revenue_previous_month = cursor.fetchone()
+        grain = "day" if (end - start).days <= 45 else "month"
+        date_format = "YYYY-MM-DD" if grain == "day" else "YYYY-MM"
+        cursor.execute("""
+            WITH buckets AS (
+                SELECT generate_series(date_trunc(%s, %s::timestamp),
+                                       date_trunc(%s, (%s::date - 1)),
+                                       CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
+            ), totals AS (
+                SELECT date_trunc(%s, p.payment_date) AS bucket, SUM(p.amount) AS revenue
+                FROM payment p
+                JOIN membership ms ON ms.membership_id = p.membership_id
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+                WHERE p.payment_date >= %s AND p.payment_date < %s
+                GROUP BY date_trunc(%s, p.payment_date)
+            )
+            SELECT to_char(b.bucket, %s), COALESCE(t.revenue, 0)
+            FROM buckets b LEFT JOIN totals t ON t.bucket = b.bucket
+            ORDER BY b.bucket;
+        """, (grain, start, grain, end, grain, grain, gym_id, start, end, grain, date_format))
+        trend = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+        cursor.execute("""
+            SELECT mp.plan_name, COALESCE(SUM(p.amount), 0)
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN membershipplan mp ON mp.plan_id = ms.plan_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s
+            GROUP BY mp.plan_id, mp.plan_name ORDER BY SUM(p.amount) DESC;
+        """, (gym_id, start, end))
+        by_plan = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+        cursor.execute("""
+            SELECT b.name, COALESCE(SUM(p.amount), 0)
             FROM payment p
             JOIN membership ms ON ms.membership_id = p.membership_id
             JOIN member m ON m.member_id = ms.member_id
             JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
             WHERE p.payment_date >= %s AND p.payment_date < %s
-            GROUP BY date_trunc(%s, p.payment_date)
-        )
-        SELECT to_char(b.bucket, %s), COALESCE(t.revenue, 0)
-        FROM buckets b LEFT JOIN totals t ON t.bucket = b.bucket
-        ORDER BY b.bucket;
-    """, (grain, start, grain, end, grain, grain, gym_id, start, end, grain, date_format))
-    trend = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
-    cursor.execute("""
-        SELECT mp.plan_name, COALESCE(SUM(p.amount), 0)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN membershipplan mp ON mp.plan_id = ms.plan_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE p.payment_date >= %s AND p.payment_date < %s
-        GROUP BY mp.plan_id, mp.plan_name ORDER BY SUM(p.amount) DESC;
-    """, (gym_id, start, end))
-    by_plan = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
-    cursor.execute("""
-        SELECT b.name, COALESCE(SUM(p.amount), 0)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE p.payment_date >= %s AND p.payment_date < %s
-        GROUP BY b.branch_id, b.name ORDER BY SUM(p.amount) DESC;
-    """, (gym_id, start, end))
-    by_branch = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+            GROUP BY b.branch_id, b.name ORDER BY SUM(p.amount) DESC;
+        """, (gym_id, start, end))
+        by_branch = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        conn.close()
     return jsonify({
         "range": {"start_date": start.isoformat(), "end_date": (end - datetime.timedelta(days=1)).isoformat()},
         "revenue": float(revenue or 0), "previous_period_revenue": float(previous_revenue or 0),
@@ -2336,40 +2408,42 @@ def analytics_memberships():
     if not conn:
         return jsonify({"error": "Authenticated gym not found."}), 403
     cursor = conn.cursor()
-    cursor.execute("""
-        WITH latest AS (
-            SELECT DISTINCT ON (ms.member_id) ms.membership_id, ms.member_id, ms.plan_id,
-                   ms.start_date, ms.end_date, ms.status
-            FROM membership ms
+    try:
+        cursor.execute("""
+            WITH latest AS (
+                SELECT DISTINCT ON (ms.member_id) ms.membership_id, ms.member_id, ms.plan_id,
+                       ms.start_date, ms.end_date, ms.status
+                FROM membership ms
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch b ON b.branch_id = m.branch_id
+                WHERE b.gym_id = %s
+                ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+            )
+            SELECT mp.plan_id, mp.plan_name,
+                   COUNT(l.membership_id) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+                   COUNT(l.membership_id) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+                   COUNT(l.membership_id) FILTER (WHERE l.end_date >= CURRENT_DATE AND l.end_date < CURRENT_DATE + 8),
+                   AVG(l.end_date - l.start_date)
+            FROM latest l JOIN membershipplan mp ON mp.plan_id = l.plan_id
+            GROUP BY mp.plan_id, mp.plan_name ORDER BY mp.plan_name;
+        """, (gym_id,))
+        plans = [{"plan_id": row[0], "plan_name": row[1], "active": row[2] or 0,
+                  "expired": row[3] or 0, "expiring_soon": row[4] or 0,
+                  "average_recorded_term_days": round(float(row[5]), 1) if row[5] is not None else None}
+                 for row in cursor.fetchall()]
+        cursor.execute("""
+            SELECT mp.plan_id, COALESCE(SUM(p.amount), 0)
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN membershipplan mp ON mp.plan_id = ms.plan_id
             JOIN member m ON m.member_id = ms.member_id
-            JOIN branch b ON b.branch_id = m.branch_id
-            WHERE b.gym_id = %s
-            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
-        )
-        SELECT mp.plan_id, mp.plan_name,
-               COUNT(l.membership_id) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
-               COUNT(l.membership_id) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
-               COUNT(l.membership_id) FILTER (WHERE l.end_date >= CURRENT_DATE AND l.end_date < CURRENT_DATE + 8),
-               AVG(l.end_date - l.start_date)
-        FROM latest l JOIN membershipplan mp ON mp.plan_id = l.plan_id
-        GROUP BY mp.plan_id, mp.plan_name ORDER BY mp.plan_name;
-    """, (gym_id,))
-    plans = [{"plan_id": row[0], "plan_name": row[1], "active": row[2] or 0,
-              "expired": row[3] or 0, "expiring_soon": row[4] or 0,
-              "average_recorded_term_days": round(float(row[5]), 1) if row[5] is not None else None}
-             for row in cursor.fetchall()]
-    cursor.execute("""
-        SELECT mp.plan_id, COALESCE(SUM(p.amount), 0)
-        FROM payment p
-        JOIN membership ms ON ms.membership_id = p.membership_id
-        JOIN membershipplan mp ON mp.plan_id = ms.plan_id
-        JOIN member m ON m.member_id = ms.member_id
-        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        GROUP BY mp.plan_id;
-    """, (gym_id,))
-    revenue = {row[0]: float(row[1] or 0) for row in cursor.fetchall()}
-    cursor.close()
-    conn.close()
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            GROUP BY mp.plan_id;
+        """, (gym_id,))
+        revenue = {row[0]: float(row[1] or 0) for row in cursor.fetchall()}
+    finally:
+        cursor.close()
+        conn.close()
     for plan in plans:
         plan["recorded_revenue"] = revenue.get(plan["plan_id"], 0)
     ranked = sorted(plans, key=lambda plan: (plan["active"], plan["plan_name"].lower()))
@@ -2396,27 +2470,29 @@ def analytics_growth():
     grain = "day" if (end - start).days <= 45 else "month"
     fmt = "YYYY-MM-DD" if grain == "day" else "YYYY-MM"
     cursor = conn.cursor()
-    cursor.execute("""
-        WITH buckets AS (
-            SELECT generate_series(date_trunc(%s, %s::timestamp),
-                                   date_trunc(%s, (%s::date - 1)),
-                                   CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
-        )
-        SELECT to_char(b.bucket, %s), COUNT(m.member_id)
-        FROM buckets b
-        LEFT JOIN member m ON date_trunc(%s, m.join_date::timestamp) = b.bucket
-        LEFT JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
-        WHERE m.member_id IS NULL OR br.branch_id IS NOT NULL
-        GROUP BY b.bucket ORDER BY b.bucket;
-    """, (grain, start, grain, end, grain, fmt, grain, gym_id))
-    new_members = [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
-    cursor.execute("""
-        SELECT COUNT(*) FROM member m JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
-        WHERE m.join_date < %s;
-    """, (gym_id, start))
-    current_records_before_period = cursor.fetchone()[0]
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute("""
+            WITH buckets AS (
+                SELECT generate_series(date_trunc(%s, %s::timestamp),
+                                       date_trunc(%s, (%s::date - 1)),
+                                       CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
+            )
+            SELECT to_char(b.bucket, %s), COUNT(m.member_id)
+            FROM buckets b
+            LEFT JOIN member m ON date_trunc(%s, m.join_date::timestamp) = b.bucket
+            LEFT JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+            WHERE m.member_id IS NULL OR br.branch_id IS NOT NULL
+            GROUP BY b.bucket ORDER BY b.bucket;
+        """, (grain, start, grain, end, grain, fmt, grain, gym_id))
+        new_members = [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
+        cursor.execute("""
+            SELECT COUNT(*) FROM member m JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE m.join_date < %s;
+        """, (gym_id, start))
+        current_records_before_period = cursor.fetchone()[0]
+    finally:
+        cursor.close()
+        conn.close()
     return jsonify({
         "new_members": new_members,
         "members_present_before_period_in_current_records": current_records_before_period,
@@ -2438,41 +2514,43 @@ def analytics_branches():
     if not conn:
         return jsonify({"error": "Authenticated gym not found."}), 403
     cursor = conn.cursor()
-    cursor.execute("""
-        WITH latest AS (
-            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
-            FROM membership ms
-            JOIN member m ON m.member_id = ms.member_id
-            JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
-            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
-        ), member_totals AS (
-            SELECT m.branch_id, COUNT(*) AS total_members,
-                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s) AS new_members,
-                   COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE) AS active_members
-            FROM member m JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
-            LEFT JOIN latest l ON l.member_id = m.member_id
-            GROUP BY m.branch_id
-        ), revenue AS (
-            SELECT m.branch_id, SUM(p.amount) AS recorded_revenue
-            FROM payment p
-            JOIN membership ms ON ms.membership_id = p.membership_id
-            JOIN member m ON m.member_id = ms.member_id
-            JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
-            WHERE p.payment_date >= %s AND p.payment_date < %s
-            GROUP BY m.branch_id
-        )
-        SELECT br.branch_id, br.name, COALESCE(mt.total_members, 0),
-               COALESCE(mt.active_members, 0), COALESCE(mt.new_members, 0),
-               COALESCE(r.recorded_revenue, 0)
-        FROM branch br LEFT JOIN member_totals mt ON mt.branch_id = br.branch_id
-        LEFT JOIN revenue r ON r.branch_id = br.branch_id
-        WHERE br.gym_id = %s ORDER BY br.name;
-    """, (gym_id, start, end, gym_id, gym_id, start, end, gym_id))
-    branches = [{"branch_id": row[0], "branch_name": row[1], "total_members": row[2],
-                 "active_members": row[3], "new_members": row[4], "recorded_revenue": float(row[5] or 0),
-                 "renewal_rate": None} for row in cursor.fetchall()]
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute("""
+            WITH latest AS (
+                SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+                FROM membership ms
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+                ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+            ), member_totals AS (
+                SELECT m.branch_id, COUNT(*) AS total_members,
+                       COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s) AS new_members,
+                       COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE) AS active_members
+                FROM member m JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+                LEFT JOIN latest l ON l.member_id = m.member_id
+                GROUP BY m.branch_id
+            ), revenue AS (
+                SELECT m.branch_id, SUM(p.amount) AS recorded_revenue
+                FROM payment p
+                JOIN membership ms ON ms.membership_id = p.membership_id
+                JOIN member m ON m.member_id = ms.member_id
+                JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+                WHERE p.payment_date >= %s AND p.payment_date < %s
+                GROUP BY m.branch_id
+            )
+            SELECT br.branch_id, br.name, COALESCE(mt.total_members, 0),
+                   COALESCE(mt.active_members, 0), COALESCE(mt.new_members, 0),
+                   COALESCE(r.recorded_revenue, 0)
+            FROM branch br LEFT JOIN member_totals mt ON mt.branch_id = br.branch_id
+            LEFT JOIN revenue r ON r.branch_id = br.branch_id
+            WHERE br.gym_id = %s ORDER BY br.name;
+        """, (gym_id, start, end, gym_id, gym_id, start, end, gym_id))
+        branches = [{"branch_id": row[0], "branch_name": row[1], "total_members": row[2],
+                     "active_members": row[3], "new_members": row[4], "recorded_revenue": float(row[5] or 0),
+                     "renewal_rate": None} for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        conn.close()
     return jsonify({"branches": branches, "unavailable_reason": "Branch renewal and retention rates require membership lifecycle history, which is not stored. Revenue is attributed using each member's current branch because payments do not store a branch at payment time."})
 
 @app.route("/membershipplans", methods=["POST"])
@@ -2490,16 +2568,21 @@ def create_membership_plan():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO MembershipPlan (plan_name, price, perks) VALUES (%s, %s, %s) RETURNING plan_id;",
-        (data["plan_name"], data["price"], data["perks"])
-    )
-    new_id = cursor.fetchone()[0]
-    conn.commit()
-    invalidate_membership_plans_cache()
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute(
+            "INSERT INTO MembershipPlan (plan_name, price, perks) VALUES (%s, %s, %s) RETURNING plan_id;",
+            (data["plan_name"], data["price"], data["perks"])
+        )
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
+    invalidate_membership_plans_cache()
     return jsonify({"message": "Membership plan created", "plan_id": new_id}), 201
 
 
@@ -2510,23 +2593,21 @@ def delete_membership_plan(plan_id):
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM MembershipPlan WHERE plan_id = %s;", (plan_id,))
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
+        conn.commit()
     except psycopg2.errors.ForeignKeyViolation:
         conn.rollback()
-        cursor.close()
-        conn.close()
         return jsonify({"error": "This plan cannot be deleted while memberships still use it."}), 409
-
-    if cursor.rowcount == 0:
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
 
-    conn.commit()
     invalidate_membership_plans_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"MembershipPlan {plan_id} deleted"}), 200
 
 
@@ -2540,22 +2621,23 @@ def update_membership_plan(plan_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE MembershipPlan SET plan_name = %s, price = %s, perks = %s WHERE plan_id = %s;",
-        (data["plan_name"], data["price"], data["perks"], plan_id)
-    )
-
-    if cursor.rowcount == 0:
+    try:
+        cursor.execute(
+            "UPDATE MembershipPlan SET plan_name = %s, price = %s, perks = %s WHERE plan_id = %s;",
+            (data["plan_name"], data["price"], data["perks"], plan_id)
+        )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
-        return jsonify({"error": f"MembershipPlan {plan_id} not found"}), 404
 
-    conn.commit()
     invalidate_membership_plans_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({"message": f"MembershipPlan {plan_id} updated"}), 200
 
 @app.route("/admins")
@@ -2564,17 +2646,17 @@ def update_membership_plan(plan_id):
 def get_admins():
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT admin_id, name, email, phone
+            FROM Admin
+            ORDER BY admin_id ASC;
+        """)
 
-    cursor.execute("""
-        SELECT admin_id, name, email, phone
-        FROM Admin
-        ORDER BY admin_id ASC;
-    """)
-
-    rows = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+        rows = cursor.fetchall()
+    finally:
+        cursor.close()
+        conn.close()
 
     admins = []
 
@@ -2614,29 +2696,32 @@ def create_admin():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT INTO Admin
-        (name, email, phone, password_hash)
-        VALUES (%s, %s, %s, %s)
-        RETURNING admin_id;
-        """,
-        (
-            data["name"],
-            data["email"],
-            data["phone"],
-            password_hash
+    try:
+        cursor.execute(
+            """
+            INSERT INTO Admin
+            (name, email, phone, password_hash)
+            VALUES (%s, %s, %s, %s)
+            RETURNING admin_id;
+            """,
+            (
+                data["name"],
+                data["email"],
+                data["phone"],
+                password_hash
+            )
         )
-    )
 
-    new_id = cursor.fetchone()[0]
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()
 
-    conn.commit()
     invalidate_admins_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({
         "message": "Admin created",
         "admin_id": new_id
@@ -2667,59 +2752,60 @@ def update_admin(admin_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        if data.get("password"):
+            password_hash = generate_password_hash(data["password"])
 
-    if data.get("password"):
-        password_hash = generate_password_hash(data["password"])
-
-        cursor.execute(
-            """
-            UPDATE Admin
-            SET name = %s,
-                email = %s,
-                phone = %s,
-                password_hash = %s
-            WHERE admin_id = %s;
-            """,
-            (
-                data["name"],
-                data["email"],
-                data["phone"],
-                password_hash,
-                admin_id
+            cursor.execute(
+                """
+                UPDATE Admin
+                SET name = %s,
+                    email = %s,
+                    phone = %s,
+                    password_hash = %s
+                WHERE admin_id = %s;
+                """,
+                (
+                    data["name"],
+                    data["email"],
+                    data["phone"],
+                    password_hash,
+                    admin_id
+                )
             )
-        )
 
-    else:
-        cursor.execute(
-            """
-            UPDATE Admin
-            SET name = %s,
-                email = %s,
-                phone = %s
-            WHERE admin_id = %s;
-            """,
-            (
-                data["name"],
-                data["email"],
-                data["phone"],
-                admin_id
+        else:
+            cursor.execute(
+                """
+                UPDATE Admin
+                SET name = %s,
+                    email = %s,
+                    phone = %s
+                WHERE admin_id = %s;
+                """,
+                (
+                    data["name"],
+                    data["email"],
+                    data["phone"],
+                    admin_id
+                )
             )
-        )
 
-    if cursor.rowcount == 0:
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({
+                "error": f"Admin {admin_id} not found"
+            }), 404
+
+        conn.commit()
+    except Exception:
         conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
 
-        return jsonify({
-            "error": f"Admin {admin_id} not found"
-        }), 404
-
-    conn.commit()
     invalidate_admins_cache()
-    cursor.close()
-    conn.close()
-
     return jsonify({
         "message": f"Admin {admin_id} updated"
     }), 200
@@ -2744,45 +2830,43 @@ def delete_admin(admin_id):
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    try:
+        # Make sure the admin exists
+        cursor.execute(
+            "SELECT admin_id FROM Admin WHERE admin_id = %s;",
+            (admin_id,)
+        )
 
-    # Make sure the admin exists
-    cursor.execute(
-        "SELECT admin_id FROM Admin WHERE admin_id = %s;",
-        (admin_id,)
-    )
+        admin = cursor.fetchone()
 
-    admin = cursor.fetchone()
+        if admin is None:
+            return jsonify({
+                "error": f"Admin {admin_id} not found"
+            }), 404
 
-    if admin is None:
+        # Make sure at least one admin remains
+        cursor.execute("SELECT COUNT(*) FROM Admin;")
+        admin_count = cursor.fetchone()[0]
+
+        if admin_count <= 1:
+            return jsonify({
+                "error": "At least one administrator must remain"
+            }), 400
+
+        cursor.execute(
+            "DELETE FROM Admin WHERE admin_id = %s;",
+            (admin_id,)
+        )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cursor.close()
         conn.close()
 
-        return jsonify({
-            "error": f"Admin {admin_id} not found"
-        }), 404
-
-    # Make sure at least one admin remains
-    cursor.execute("SELECT COUNT(*) FROM Admin;")
-    admin_count = cursor.fetchone()[0]
-
-    if admin_count <= 1:
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            "error": "At least one administrator must remain"
-        }), 400
-
-    cursor.execute(
-        "DELETE FROM Admin WHERE admin_id = %s;",
-        (admin_id,)
-    )
-
-    conn.commit()
     invalidate_admins_cache()
-
-    cursor.close()
-    conn.close()
 
     return jsonify({
         "message": f"Admin {admin_id} deleted"
@@ -2802,10 +2886,12 @@ def login():
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT admin_id, name, password_hash, gym_id FROM Admin WHERE email = %s;", (data["email"],))
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
+    try:
+        cursor.execute("SELECT admin_id, name, password_hash, gym_id FROM Admin WHERE email = %s;", (data["email"],))
+        row = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
 
     if row is None:
         return jsonify({"error": "Invalid email or password"}), 401
