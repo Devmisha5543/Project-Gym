@@ -921,7 +921,7 @@ def update_member(member_id):
                     "error": "Upload a valid JPG, PNG, GIF, or WebP image."
                 }), 400
 
-            photo_filename = secure_filename(file.filename)
+            photo_filename = f"{secrets.token_hex(8)}_{secure_filename(file.filename)}"
 
             file.save(
                 os.path.join(
