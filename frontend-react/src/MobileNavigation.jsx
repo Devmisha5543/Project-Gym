@@ -2,6 +2,7 @@ import { useState, useEffect, useSyncExternalStore } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
+  BarChart3,
   Users,
   Building2,
   Dumbbell,
@@ -26,6 +27,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 
 const primaryNav = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/members', label: 'Members', icon: Users },
   { path: '/branches', label: 'Branches', icon: Building2 },
   { path: '/trainers', label: 'Trainers', icon: Dumbbell },

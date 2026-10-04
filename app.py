@@ -30,20 +30,37 @@ except redis.RedisError as e:
 
 def invalidate_members_cache():
     redis_client.delete("members:all")
+    invalidate_analytics_cache()
     print("Members cache invalidated") 
+
+def invalidate_analytics_cache():
+    gym_id = getattr(request, "decoded_token", {}).get("gym_id")
+    if gym_id is None:
+        return
+    try:
+        redis_client.incr(f"analytics:version:{gym_id}")
+    except redis.RedisError:
+        app.logger.warning("Analytics cache version could not be updated")
+
 
 def cache_response(cache_key):
     def decorator(f):
         @wraps(f)
         def decorated(*args, **kwargs):
             key = cache_key() if callable(cache_key) else cache_key
-            cached = redis_client.get(key)
+            try:
+                cached = redis_client.get(key)
+            except redis.RedisError:
+                cached = None
             if cached:
                 return jsonify(json.loads(cached))
 
-            response = f(*args, **kwargs)
+            response = app.make_response(f(*args, **kwargs))
             if response.status_code == 200:
-                redis_client.setex(key, 300, response.get_data(as_text=True))
+                try:
+                    redis_client.setex(key, 300, response.get_data(as_text=True))
+                except redis.RedisError:
+                    app.logger.warning("Response cache write failed for %s", key)
             return response
         return decorated
     return decorator
@@ -52,6 +69,7 @@ def invalidate_caches(*keys):
     redis_client.delete(*keys)
 
 def invalidate_branches_cache():
+    invalidate_analytics_cache()
     invalidate_caches(
         "branches:all", "classes:all", "equipment:all", "trainer_branches:all"
     )
@@ -63,18 +81,21 @@ def invalidate_classes_cache():
     invalidate_caches("classes:all", "class_bookings:all")
 
 def invalidate_memberships_cache():
+    invalidate_analytics_cache()
     invalidate_caches(
         "memberships:all", "payments:all",
         f"memberships:expiring:{datetime.date.today().isoformat()}"
     )
 
 def invalidate_membership_plans_cache():
+    invalidate_analytics_cache()
     invalidate_caches("membership_plans:all", "memberships:all")
 
 def invalidate_class_bookings_cache():
     invalidate_caches("class_bookings:all")
 
 def invalidate_payments_cache():
+    invalidate_analytics_cache()
     invalidate_caches("payments:all")
 
 def invalidate_equipment_cache():
@@ -1708,6 +1729,443 @@ def get_membership_plans():
 
     return jsonify(plans)
 
+
+def _analytics_period():
+    today = datetime.date.today()
+    period = request.args.get("range", "6m")
+    if period in ("this_month", "month"):
+        start = today.replace(day=1)
+        end = today + datetime.timedelta(days=1)
+    elif period == "last_month":
+        end = today.replace(day=1)
+        start = (end - datetime.timedelta(days=1)).replace(day=1)
+    elif period in ("3m", "6m", "12m"):
+        months = int(period[:-1])
+        end = today + datetime.timedelta(days=1)
+        month_index = today.year * 12 + today.month - 1 - (months - 1)
+        start = datetime.date(month_index // 12, month_index % 12 + 1, 1)
+    elif period == "this_year":
+        start = today.replace(month=1, day=1)
+        end = today + datetime.timedelta(days=1)
+    elif period == "custom":
+        try:
+            start = datetime.date.fromisoformat(request.args["start_date"])
+            end = datetime.date.fromisoformat(request.args["end_date"]) + datetime.timedelta(days=1)
+        except (KeyError, ValueError):
+            raise ValueError("Custom ranges require valid start_date and end_date values.")
+        if end <= start:
+            raise ValueError("end_date must be on or after start_date.")
+    else:
+        raise ValueError("range must be this_month, last_month, 3m, 6m, 12m, this_year, or custom.")
+
+    previous_start = start - (end - start)
+    return start, end, previous_start
+
+
+def _analytics_cache_key(metric):
+    gym_id = get_authenticated_gym_id()
+    try:
+        version = redis_client.get(f"analytics:version:{gym_id}") or "0"
+    except redis.RedisError:
+        version = "uncached"
+    filters = "&".join(f"{key}={value}" for key, value in sorted(request.args.items()))
+    return f"analytics:v1:{gym_id}:{version}:{metric}:{filters}"
+
+
+def _analytics_connection():
+    conn = get_db_connection()
+    gym_id = get_authenticated_gym_id(conn)
+    if not gym_id:
+        conn.close()
+        return None, None
+    return conn, gym_id
+
+
+@app.route("/analytics/overview")
+@token_required
+@cache_response(lambda: _analytics_cache_key("overview"))
+def analytics_overview():
+    try:
+        start, end, previous_start = _analytics_period()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    cursor = conn.cursor()
+    today = datetime.date.today()
+    month_start = today.replace(day=1)
+    previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
+    cursor.execute("""
+        WITH latest AS (
+            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+            FROM membership ms
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id
+            WHERE b.gym_id = %s
+            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+        )
+        SELECT COUNT(*),
+               COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+               COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+               COUNT(*) FILTER (WHERE l.status = 'cancelled'),
+               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s),
+               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
+        FROM member m
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        LEFT JOIN latest l ON l.member_id = m.member_id;
+    """, (gym_id, start, end, previous_start, start, month_start, today + datetime.timedelta(days=1),
+          previous_month_start, month_start, gym_id))
+    total, active, expired, cancelled, new_members, previous_new, new_this_month, new_previous_month = cursor.fetchone()
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.amount), 0),
+               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s;
+    """, (start, end, previous_start, start, month_start, today + datetime.timedelta(days=1),
+          previous_month_start, month_start, gym_id))
+    lifetime_revenue, revenue, previous_revenue, revenue_this_month, revenue_previous_month = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    growth = new_members - previous_new
+    return jsonify({
+        "range": {"start_date": start.isoformat(), "end_date": (end - datetime.timedelta(days=1)).isoformat()},
+        "total_members": total,
+        "active_members": active,
+        "new_members": new_members,
+        "new_members_previous_period": previous_new,
+        "member_growth": growth,
+        "member_growth_percent": round(growth * 100 / previous_new, 1) if previous_new else None,
+        "new_members_this_month": new_this_month,
+        "new_members_previous_month": new_previous_month,
+        "member_growth_vs_previous_month": new_this_month - new_previous_month,
+        "member_growth_vs_previous_month_percent": round((new_this_month - new_previous_month) * 100 / new_previous_month, 1) if new_previous_month else None,
+        "expired_memberships": expired,
+        "cancelled_memberships": cancelled,
+        "total_recorded_revenue": float(lifetime_revenue or 0),
+        "revenue_this_month": float(revenue_this_month or 0),
+        "revenue_previous_month": float(revenue_previous_month or 0),
+        "revenue": float(revenue or 0),
+        "revenue_previous_period": float(previous_revenue or 0),
+        "revenue_change": float((revenue or 0) - (previous_revenue or 0)),
+        "revenue_change_percent": round(float((revenue - previous_revenue) * 100 / previous_revenue), 1) if previous_revenue else None,
+        "renewals": None,
+        "renewal_rate": None,
+        "members_lost": None,
+        "churn_rate": None,
+        "unavailable_metrics": {
+            "renewals": "Renewal payments extend a membership row in place, and the payment table does not record whether a payment was a renewal.",
+            "retention_and_churn": "There is no membership lifecycle history or voluntary cancellation event. Expiration does not establish that a member quit."
+        }
+    })
+
+
+@app.route("/analytics/retention")
+@token_required
+@cache_response(lambda: _analytics_cache_key("retention"))
+def analytics_retention():
+    try:
+        start, end, _ = _analytics_period()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    cursor = conn.cursor()
+    cursor.execute("""
+        WITH latest AS (
+            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+            FROM membership ms
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id
+            WHERE b.gym_id = %s
+            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+        )
+        SELECT COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+               COUNT(*) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+               COUNT(*) FILTER (WHERE l.status = 'cancelled'),
+               COUNT(*) FILTER (WHERE l.member_id IS NULL),
+               COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s)
+        FROM member m
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        LEFT JOIN latest l ON l.member_id = m.member_id;
+    """, (gym_id, start, end, gym_id))
+    active, expired, cancelled, no_membership, new_members = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    return jsonify({
+        "current_active_memberships": active,
+        "current_expired_memberships": expired,
+        "explicitly_cancelled_memberships": cancelled,
+        "members_without_membership_record": no_membership,
+        "new_members_in_period": new_members,
+        "renewed_memberships": None,
+        "members_lost": None,
+        "retention_rate": None,
+        "churn_rate": None,
+        "unavailable_reason": "Membership renewals update end_date in place; there is no lifecycle history or voluntary quit event. Historical continuation, renewal, retention, and churn cannot be reconstructed."
+    })
+
+
+@app.route("/analytics/financial")
+@token_required
+@cache_response(lambda: _analytics_cache_key("financial"))
+def analytics_financial():
+    try:
+        start, end, previous_start = _analytics_period()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    cursor = conn.cursor()
+    today = datetime.date.today()
+    month_start = today.replace(day=1)
+    previous_month_start = (month_start - datetime.timedelta(days=1)).replace(day=1)
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE p.payment_date >= %s AND p.payment_date < %s;
+    """, (gym_id, start, end))
+    revenue, paying_members = cursor.fetchone()
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.amount), 0), COUNT(DISTINCT m.member_id)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE p.payment_date >= %s AND p.payment_date < %s;
+    """, (gym_id, previous_start, start))
+    previous_revenue = cursor.fetchone()[0]
+    cursor.execute("""
+        SELECT COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0),
+               COALESCE(SUM(p.amount) FILTER (WHERE p.payment_date >= %s AND p.payment_date < %s), 0)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE p.payment_date >= %s AND p.payment_date < %s;
+    """, (month_start, today + datetime.timedelta(days=1), previous_month_start, month_start,
+          gym_id, previous_month_start, today + datetime.timedelta(days=1)))
+    revenue_this_month, revenue_previous_month = cursor.fetchone()
+    grain = "day" if (end - start).days <= 45 else "month"
+    date_format = "YYYY-MM-DD" if grain == "day" else "YYYY-MM"
+    cursor.execute("""
+        WITH buckets AS (
+            SELECT generate_series(date_trunc(%s, %s::timestamp),
+                                   date_trunc(%s, (%s::date - 1)),
+                                   CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
+        ), totals AS (
+            SELECT date_trunc(%s, p.payment_date) AS bucket, SUM(p.amount) AS revenue
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s
+            GROUP BY date_trunc(%s, p.payment_date)
+        )
+        SELECT to_char(b.bucket, %s), COALESCE(t.revenue, 0)
+        FROM buckets b LEFT JOIN totals t ON t.bucket = b.bucket
+        ORDER BY b.bucket;
+    """, (grain, start, grain, end, grain, grain, gym_id, start, end, grain, date_format))
+    trend = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT mp.plan_name, COALESCE(SUM(p.amount), 0)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN membershipplan mp ON mp.plan_id = ms.plan_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE p.payment_date >= %s AND p.payment_date < %s
+        GROUP BY mp.plan_id, mp.plan_name ORDER BY SUM(p.amount) DESC;
+    """, (gym_id, start, end))
+    by_plan = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT b.name, COALESCE(SUM(p.amount), 0)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE p.payment_date >= %s AND p.payment_date < %s
+        GROUP BY b.branch_id, b.name ORDER BY SUM(p.amount) DESC;
+    """, (gym_id, start, end))
+    by_branch = [{"label": row[0], "revenue": float(row[1] or 0)} for row in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return jsonify({
+        "range": {"start_date": start.isoformat(), "end_date": (end - datetime.timedelta(days=1)).isoformat()},
+        "revenue": float(revenue or 0), "previous_period_revenue": float(previous_revenue or 0),
+        "revenue_this_month": float(revenue_this_month or 0),
+        "revenue_previous_month": float(revenue_previous_month or 0),
+        "paying_members": paying_members,
+        "average_revenue_per_paying_member": round(float(revenue or 0) / paying_members, 2) if paying_members else 0,
+        "trend": trend, "revenue_by_plan": by_plan, "revenue_by_branch": by_branch,
+        "revenue_from_new_memberships": None, "revenue_from_renewals": None,
+        "outstanding_payments": None,
+        "unavailable_metrics": {
+            "payment_type": "Payments do not identify new memberships versus renewals.",
+            "outstanding_payments": "The payment table has no unpaid balance or payment status field. Recorded payment rows are the only measurable revenue.",
+            "historical_branch_and_plan_attribution": "Payments link to a membership, but do not store the branch or plan at payment time. Breakdown uses the member's current branch and membership's current plan."
+        }
+    })
+
+
+@app.route("/analytics/memberships")
+@token_required
+@cache_response(lambda: _analytics_cache_key("memberships"))
+def analytics_memberships():
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    cursor = conn.cursor()
+    cursor.execute("""
+        WITH latest AS (
+            SELECT DISTINCT ON (ms.member_id) ms.membership_id, ms.member_id, ms.plan_id,
+                   ms.start_date, ms.end_date, ms.status
+            FROM membership ms
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch b ON b.branch_id = m.branch_id
+            WHERE b.gym_id = %s
+            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+        )
+        SELECT mp.plan_id, mp.plan_name,
+               COUNT(l.membership_id) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE),
+               COUNT(l.membership_id) FILTER (WHERE l.status = 'expired' OR (l.end_date < CURRENT_DATE AND l.status <> 'cancelled')),
+               COUNT(l.membership_id) FILTER (WHERE l.end_date >= CURRENT_DATE AND l.end_date < CURRENT_DATE + 8),
+               AVG(l.end_date - l.start_date)
+        FROM latest l JOIN membershipplan mp ON mp.plan_id = l.plan_id
+        GROUP BY mp.plan_id, mp.plan_name ORDER BY mp.plan_name;
+    """, (gym_id,))
+    plans = [{"plan_id": row[0], "plan_name": row[1], "active": row[2] or 0,
+              "expired": row[3] or 0, "expiring_soon": row[4] or 0,
+              "average_recorded_term_days": round(float(row[5]), 1) if row[5] is not None else None}
+             for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT mp.plan_id, COALESCE(SUM(p.amount), 0)
+        FROM payment p
+        JOIN membership ms ON ms.membership_id = p.membership_id
+        JOIN membershipplan mp ON mp.plan_id = ms.plan_id
+        JOIN member m ON m.member_id = ms.member_id
+        JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        GROUP BY mp.plan_id;
+    """, (gym_id,))
+    revenue = {row[0]: float(row[1] or 0) for row in cursor.fetchall()}
+    cursor.close()
+    conn.close()
+    for plan in plans:
+        plan["recorded_revenue"] = revenue.get(plan["plan_id"], 0)
+    ranked = sorted(plans, key=lambda plan: (plan["active"], plan["plan_name"].lower()))
+    return jsonify({
+        "plans": plans,
+        "most_popular_plan": next((plan["plan_name"] for plan in reversed(ranked) if plan["active"]), None),
+        "least_popular_plan": next((plan["plan_name"] for plan in ranked if plan["active"]), None),
+        "renewal_rate_by_plan": None,
+        "unavailable_reason": "Membership history is overwritten during renewals, so a renewal rate by plan cannot be calculated. Average duration reflects the currently recorded term, which may have been extended. Recorded revenue uses the membership's current plan. MembershipPlan has no gym_id, so only plans used by this gym's current memberships are included."
+    })
+
+
+@app.route("/analytics/growth")
+@token_required
+@cache_response(lambda: _analytics_cache_key("growth"))
+def analytics_growth():
+    try:
+        start, end, _ = _analytics_period()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    grain = "day" if (end - start).days <= 45 else "month"
+    fmt = "YYYY-MM-DD" if grain == "day" else "YYYY-MM"
+    cursor = conn.cursor()
+    cursor.execute("""
+        WITH buckets AS (
+            SELECT generate_series(date_trunc(%s, %s::timestamp),
+                                   date_trunc(%s, (%s::date - 1)),
+                                   CASE WHEN %s = 'day' THEN interval '1 day' ELSE interval '1 month' END) AS bucket
+        )
+        SELECT to_char(b.bucket, %s), COUNT(m.member_id)
+        FROM buckets b
+        LEFT JOIN member m ON date_trunc(%s, m.join_date::timestamp) = b.bucket
+        LEFT JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+        WHERE m.member_id IS NULL OR br.branch_id IS NOT NULL
+        GROUP BY b.bucket ORDER BY b.bucket;
+    """, (grain, start, grain, end, grain, fmt, grain, gym_id))
+    new_members = [{"label": row[0], "count": row[1]} for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT COUNT(*) FROM member m JOIN branch b ON b.branch_id = m.branch_id AND b.gym_id = %s
+        WHERE m.join_date < %s;
+    """, (gym_id, start))
+    current_records_before_period = cursor.fetchone()[0]
+    cursor.close()
+    conn.close()
+    return jsonify({
+        "new_members": new_members,
+        "members_present_before_period_in_current_records": current_records_before_period,
+        "active_members_over_time": None,
+        "returning_members_over_time": None,
+        "unavailable_reason": "The schema stores a member's current join date and current membership dates/status, without change history. It cannot reconstruct historical active-member snapshots or distinguish returning members from renewal events."
+    })
+
+
+@app.route("/analytics/branches")
+@token_required
+@cache_response(lambda: _analytics_cache_key("branches"))
+def analytics_branches():
+    try:
+        start, end, _ = _analytics_period()
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    conn, gym_id = _analytics_connection()
+    if not conn:
+        return jsonify({"error": "Authenticated gym not found."}), 403
+    cursor = conn.cursor()
+    cursor.execute("""
+        WITH latest AS (
+            SELECT DISTINCT ON (ms.member_id) ms.member_id, ms.status, ms.end_date
+            FROM membership ms
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+            ORDER BY ms.member_id, ms.end_date DESC, ms.membership_id DESC
+        ), member_totals AS (
+            SELECT m.branch_id, COUNT(*) AS total_members,
+                   COUNT(*) FILTER (WHERE m.join_date >= %s AND m.join_date < %s) AS new_members,
+                   COUNT(*) FILTER (WHERE l.status = 'active' AND l.end_date >= CURRENT_DATE) AS active_members
+            FROM member m JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+            LEFT JOIN latest l ON l.member_id = m.member_id
+            GROUP BY m.branch_id
+        ), revenue AS (
+            SELECT m.branch_id, SUM(p.amount) AS recorded_revenue
+            FROM payment p
+            JOIN membership ms ON ms.membership_id = p.membership_id
+            JOIN member m ON m.member_id = ms.member_id
+            JOIN branch br ON br.branch_id = m.branch_id AND br.gym_id = %s
+            WHERE p.payment_date >= %s AND p.payment_date < %s
+            GROUP BY m.branch_id
+        )
+        SELECT br.branch_id, br.name, COALESCE(mt.total_members, 0),
+               COALESCE(mt.active_members, 0), COALESCE(mt.new_members, 0),
+               COALESCE(r.recorded_revenue, 0)
+        FROM branch br LEFT JOIN member_totals mt ON mt.branch_id = br.branch_id
+        LEFT JOIN revenue r ON r.branch_id = br.branch_id
+        WHERE br.gym_id = %s ORDER BY br.name;
+    """, (gym_id, start, end, gym_id, gym_id, start, end, gym_id))
+    branches = [{"branch_id": row[0], "branch_name": row[1], "total_members": row[2],
+                 "active_members": row[3], "new_members": row[4], "recorded_revenue": float(row[5] or 0),
+                 "renewal_rate": None} for row in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return jsonify({"branches": branches, "unavailable_reason": "Branch renewal and retention rates require membership lifecycle history, which is not stored. Revenue is attributed using each member's current branch because payments do not store a branch at payment time."})
 @app.route("/membershipplans", methods=["POST"])
 @token_required
 def create_membership_plan():

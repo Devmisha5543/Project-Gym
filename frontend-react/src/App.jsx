@@ -13,6 +13,7 @@ import MembersPage from './MembersPage'
 import BranchPage from './BranchPage'
 import TrainerPage from './TrainerPage'
 import MembershipPlanPage from './MembershipPlanPage'
+import AnalyticsPage from './AnalyticsPage'
 import MembershipPage from './MembershipPage'
 import PersonalTrainingAssignmentPage from './PersonalTrainingAssignmentPage'
 import ClassPage from './ClassPage'
@@ -35,6 +36,7 @@ const navigation = [
     title: 'Main',
     items: [
       { path: '/dashboard', label: 'Dashboard' },
+      { path: '/analytics', label: 'Analytics' },
       { path: '/members', label: 'Members' },
       { path: '/branches', label: 'Branches' },
       { path: '/trainers', label: 'Trainers' },
@@ -247,6 +249,8 @@ function App() {
           path="/dashboard"
           element={<DashboardPage />}
         />
+
+        <Route path="/analytics" element={<AnalyticsPage />} />
 
         <Route
           path="/members"
