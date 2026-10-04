@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CreditCard,
   DollarSign,
@@ -16,6 +17,7 @@ function MembershipPlanList({
   onPlanUpdated,
   onPlanDeleted
 }) {
+  const { t } = useTranslation(['payments', 'common'])
   const [editingId, setEditingId] = useState(null)
 
   const [editForm, setEditForm] = useState({
@@ -61,17 +63,17 @@ function MembershipPlanList({
 
   async function handleUpdate(planId) {
     if (!editForm.plan_name.trim()) {
-      setError('Plan name is required.')
+      setError(t('planNameRequired'))
       return
     }
 
     if (editForm.price === '' || Number(editForm.price) < 0) {
-      setError('Please enter a valid price.')
+      setError(t('validPriceRequired'))
       return
     }
 
     if (!editForm.perks.trim()) {
-      setError('Perks are required.')
+      setError(t('perksRequired'))
       return
     }
 
@@ -98,7 +100,7 @@ function MembershipPlanList({
 
       if (!response.ok) {
         throw new Error(
-          data.error || 'Failed to update membership plan.'
+          data.error || t('planUpdateFailed')
         )
       }
 
@@ -109,7 +111,7 @@ function MembershipPlanList({
       }
     } catch (err) {
       console.error('Failed to update membership plan:', err)
-      setError(err.message || 'Unable to update membership plan.')
+      setError(err.message || t('planUpdateFailed'))
     } finally {
       setSaving(false)
     }
@@ -117,7 +119,7 @@ function MembershipPlanList({
 
   async function handleDelete(plan) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${plan.plan_name}"?`
+      t('deletePlanConfirm', { name: plan.plan_name })
     )
 
     if (!confirmed) {
@@ -139,7 +141,7 @@ function MembershipPlanList({
 
       if (!response.ok) {
         throw new Error(
-          data.error || 'Failed to delete membership plan.'
+          data.error || t('planDeleteFailed')
         )
       }
 
@@ -149,7 +151,7 @@ function MembershipPlanList({
     } catch (err) {
       console.error('Failed to delete membership plan:', err)
       setError(
-        err.message || 'Unable to delete membership plan.'
+        err.message || t('planDeleteFailed')
       )
     } finally {
       setDeletingId(null)
@@ -163,10 +165,8 @@ function MembershipPlanList({
           <CreditCard size={25} />
         </div>
 
-        <h3>No membership plans yet</h3>
-        <p>
-          Create your first plan above to start building the catalogue.
-        </p>
+        <h3>{t('noPlans')}</h3>
+        <p>{t('noPlansDescription')}</p>
       </div>
     )
   }
@@ -197,14 +197,14 @@ function MembershipPlanList({
                 </div>
 
                 <span className="plan-card-label">
-                  Editing Plan #{plan.plan_id}
+                  {t('editingPlan', { id: plan.plan_id })}
                 </span>
               </div>
 
               <div className="plan-form-grid">
 
                 <label className="plan-field">
-                  <span>Plan name</span>
+                  <span>{t('planName')}</span>
 
                   <div className="plan-input-wrap">
                     <CreditCard size={16} />
@@ -224,7 +224,7 @@ function MembershipPlanList({
                 </label>
 
                 <label className="plan-field">
-                  <span>Price</span>
+                  <span>{t('price')}</span>
 
                   <div className="plan-input-wrap">
                     <DollarSign size={16} />
@@ -245,7 +245,7 @@ function MembershipPlanList({
                 </label>
 
                 <label className="plan-field plan-field-wide">
-                  <span>Perks</span>
+                  <span>{t('perks')}</span>
 
                   <div className="plan-input-wrap">
                     <Sparkles size={16} />
@@ -279,8 +279,8 @@ function MembershipPlanList({
                   <Save size={16} />
 
                   {saving
-                    ? 'Saving...'
-                    : 'Save Changes'}
+                    ? t('saving', { ns: 'common' })
+                    : t('save', { ns: 'common' })}
                 </button>
 
                 <button
@@ -290,7 +290,7 @@ function MembershipPlanList({
                   disabled={saving}
                 >
                   <X size={16} />
-                  Cancel
+                  {t('cancel', { ns: 'common' })}
                 </button>
 
               </div>
@@ -307,7 +307,7 @@ function MembershipPlanList({
                 </div>
 
                 <span className="plan-card-label">
-                  Plan #{plan.plan_id}
+                  {t('planCardLabel', { id: plan.plan_id })}
                 </span>
 
               </div>
@@ -326,7 +326,7 @@ function MembershipPlanList({
                 <Sparkles size={15} />
 
                 <span>
-                  {plan.perks || 'Benefits not provided'}
+                  {plan.perks || t('perksNotProvided')}
                 </span>
               </div>
 
@@ -338,7 +338,7 @@ function MembershipPlanList({
                   onClick={() => startEditing(plan)}
                 >
                   <Pencil size={15} />
-                  Edit
+                  {t('edit', { ns: 'common' })}
                 </button>
 
                 <button
@@ -352,8 +352,8 @@ function MembershipPlanList({
                   <Trash2 size={15} />
 
                   {deletingId === plan.plan_id
-                    ? 'Deleting...'
-                    : 'Delete'}
+                    ? t('deleting', { ns: 'common' })
+                    : t('delete', { ns: 'common' })}
                 </button>
 
               </div>

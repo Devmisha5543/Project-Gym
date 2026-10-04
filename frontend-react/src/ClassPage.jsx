@@ -1,16 +1,18 @@
 import { authFetch } from './authFetch'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import ClassList from './ClassList'
 import ClassForm from './ClassForm'
 import { CalendarDays, Receipt } from 'lucide-react'
 
 function ClassPage() {
+  const { t } = useTranslation(['classes', 'common'])
   const [classes, setClasses] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  function loadClasses() {
+  const loadClasses = useCallback(() => {
     setLoading(true)
     setPageError('')
 
@@ -22,35 +24,35 @@ function ClassPage() {
 
         return response.json()
       })
-      .then(data => setClasses(data))
+      .then(data => setClasses(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load classes:', error)
         setClasses([])
-        setPageError('Unable to load classes. Please try again.')
+        setPageError(t('classLoadFailed'))
       })
       .finally(() => setLoading(false))
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadClasses, 0)
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadClasses])
 
   return (
     <div className="page-container classes-page">
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">GYM MANAGEMENT</p>
-          <h1>Classes</h1>
+          <p className="page-eyebrow">{t('eyebrow')}</p>
+          <h1>{t('classesTitle')}</h1>
           <p className="page-description">
-            Schedule and organize the classes available at your gym.
+            {t('classesDescription')}
           </p>
         </div>
 
         <div className="class-total">
           <CalendarDays size={19} />
           <span>{classes.length}</span>
-          <small>Total Classes</small>
+          <small>{t('totalClasses')}</small>
         </div>
       </div>
 
@@ -66,14 +68,14 @@ function ClassPage() {
       {loading ? (
         <div className="class-state">
           <div className="loading-spinner"></div>
-          <h3>Loading classes</h3>
-          <p>Getting your class schedule ready.</p>
+          <h3>{t('loadingClasses')}</h3>
+          <p>{t('gettingClassesReady')}</p>
         </div>
       ) : (
         <ClassList 
-        classes={classes}
-        onClassUpdated={loadClasses}
-        onClassDeleted={loadClasses} 
+          classes={classes}
+          onClassUpdated={loadClasses}
+          onClassDeleted={loadClasses} 
         />
       )}
     </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { trainerSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { Award, Mail, Phone, Plus, Save, UserRound } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function TrainerForm({ onTrainerCreated }) {
+  const { t } = useTranslation(['people', 'common'])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -39,7 +41,7 @@ function TrainerForm({ onTrainerCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create trainer.')
+        if (!response.ok) throw new Error(data.error || t('trainerCreateFailed'))
         return data
       })
       .then(() => {
@@ -48,9 +50,9 @@ function TrainerForm({ onTrainerCreated }) {
         setEmail('')
         setCertification('')
         onTrainerCreated()
-        setFeedback({ type: 'success', message: 'Trainer created successfully.' })
+        setFeedback({ type: 'success', message: t('trainerCreated') })
       })
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create trainer.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('trainerCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
@@ -61,33 +63,33 @@ function TrainerForm({ onTrainerCreated }) {
           <Plus size={19} />
         </div>
         <div>
-          <h2>Add New Trainer</h2>
-          <p>Register a coach for your gym team.</p>
+          <h2>{t('addNewTrainer')}</h2>
+          <p>{t('registerTrainer')}</p>
         </div>
       </div>
 
       <form className="trainer-form" onSubmit={handleSubmit}>
         <div className="trainer-form-grid">
           <label className="trainer-field">
-            <span>Full name</span>
+            <span>{t('name', { ns: 'common' })}</span>
             <div className="trainer-input-wrap">
               <UserRound size={16} />
-              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="Enter trainer name" />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder={t('trainerName')} />
             </div>
             {errors.name && <small className="trainer-field-error">{errors.name}</small>}
           </label>
 
           <label className="trainer-field">
-            <span>Phone</span>
+            <span>{t('phone', { ns: 'common' })}</span>
             <div className="trainer-input-wrap">
               <Phone size={16} />
-              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="Trainer phone number" />
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder={t('trainerPhone')} />
             </div>
             {errors.phone && <small className="trainer-field-error">{errors.phone}</small>}
           </label>
 
           <label className="trainer-field">
-            <span>Email</span>
+            <span>{t('email', { ns: 'common' })}</span>
             <div className="trainer-input-wrap">
               <Mail size={16} />
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="trainer@example.com" />
@@ -96,10 +98,10 @@ function TrainerForm({ onTrainerCreated }) {
           </label>
 
           <label className="trainer-field">
-            <span>Certification</span>
+            <span>{t('certification')}</span>
             <div className="trainer-input-wrap">
               <Award size={16} />
-              <input type="text" value={certification} onChange={e => setCertification(e.target.value)} required placeholder="e.g. Strength & Conditioning" />
+              <input type="text" value={certification} onChange={e => setCertification(e.target.value)} required placeholder={t('certificationPlaceholder')} />
             </div>
             {errors.certification && <small className="trainer-field-error">{errors.certification}</small>}
           </label>
@@ -108,7 +110,7 @@ function TrainerForm({ onTrainerCreated }) {
         <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="trainer-form-actions">
           <button type="submit" className="trainer-primary-button" disabled={submitting}>
-            <Save size={16} /> {submitting ? 'Creating...' : 'Add Trainer'}
+            <Save size={16} /> {submitting ? t('creating') : t('addTrainer')}
           </button>
         </div>
       </form>

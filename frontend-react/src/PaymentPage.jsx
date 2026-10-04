@@ -1,5 +1,6 @@
 import { authFetch } from './authFetch'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import PaymentList from './PaymentList'
 import PaymentForm from './PaymentForm'
@@ -7,6 +8,7 @@ import { CreditCard, Receipt } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function PaymentPage() {
+  const { t } = useTranslation(['payments', 'common'])
   const location = useLocation()
   const navigate = useNavigate()
   const renewalMembershipId = location.state?.renewalMembershipId
@@ -14,7 +16,7 @@ function PaymentPage() {
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  function loadPayments() {
+  const loadPayments = useCallback(() => {
     setLoading(true)
     setPageError('')
 
@@ -28,54 +30,44 @@ function PaymentPage() {
 
         return response.json()
       })
-      .then(data => setPayments(data))
+      .then(data => setPayments(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load payments:', error)
-
         setPayments([])
-
-        setPageError(
-          'Unable to load payments. Please try again.'
-        )
+        setPageError(t('paymentLoadFailed'))
       })
       .finally(() => setLoading(false))
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadPayments, 0)
-
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadPayments])
 
   return (
     <div className="page-container payments-page">
-
       <div className="page-header">
-
         <div>
           <p className="page-eyebrow">
-            GYM MANAGEMENT
+            {t('eyebrow')}
           </p>
 
-          <h1>Payments</h1>
+          <h1>{t('paymentsTitle')}</h1>
 
           <p className="page-description">
-            Record and review membership payments across your gym.
+            {t('paymentsDescription')}
           </p>
         </div>
 
         <div className="payment-total">
           <CreditCard size={19} />
-
           <span>
             {payments.length}
           </span>
-
           <small>
-            Total Payments
+            {t('totalPayments')}
           </small>
         </div>
-
       </div>
 
       <PaymentForm
@@ -92,31 +84,18 @@ function PaymentPage() {
       )}
 
       {loading ? (
-
         <div className="payment-state">
-
           <div className="loading-spinner"></div>
-
-          <h3>
-            Loading payments
-          </h3>
-
-          <p>
-            Getting your transaction history ready.
-          </p>
-
+          <h3>{t('loadingPayments')}</h3>
+          <p>{t('gettingPaymentsReady')}</p>
         </div>
-
       ) : (
-
         <PaymentList
           payments={payments}
           onPaymentUpdated={loadPayments}
           onPaymentDeleted={loadPayments}
         />
-
       )}
-
     </div>
   )
 }

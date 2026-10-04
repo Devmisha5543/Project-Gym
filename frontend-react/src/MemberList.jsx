@@ -3,8 +3,10 @@ import { useState } from 'react'
 import { API_URL } from './config'
 import MemberDetail from './MemberDetail'
 import MemberPhoto from './MemberPhoto'
+import { useTranslation } from 'react-i18next'
 
 function MemberList({ members, memberships = [], branches, onMemberUpdated, onMemberDeleted, onFeedback, onRenew }) {
+  const { t } = useTranslation('members')
   const [selectedMember, setSelectedMember] = useState(null)
 
   if (members.length === 0) {
@@ -13,8 +15,8 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
         <div className="empty-icon">
           <UserRound size={32} />
         </div>
-        <h3>No members found</h3>
-        <p>Try changing your search or branch filter.</p>
+        <h3>{t('noMembers')}</h3>
+        <p>{t('tryChangeSearch')}</p>
       </div>
     )
   }
@@ -56,14 +58,14 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
         <table className="members-table">
           <thead>
             <tr>
-              <th className="th-name">Name</th>
-              <th className="th-gender">Gender</th>
-              <th className="th-phone">Phone</th>
-              <th className="th-branch">Branch</th>
-              <th className="th-address">Address</th>
-              <th className="th-joined">Joined Date</th>
-              <th className="th-trainer">Personal Trainer</th>
-              <th className="th-status">Status</th>
+              <th className="th-name">{t('common:name')}</th>
+              <th className="th-gender">{t('gender')}</th>
+              <th className="th-phone">{t('common:phone')}</th>
+              <th className="th-branch">{t('branch')}</th>
+              <th className="th-address">{t('common:address')}</th>
+              <th className="th-joined">{t('joinedDate')}</th>
+              <th className="th-trainer">{t('personalTrainer')}</th>
+              <th className="th-status">{t('common:status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -80,7 +82,7 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
                     setSelectedMember(member)
                   }
                 }}
-                aria-label={`View details for ${member.name}`}
+                aria-label={t('viewMemberProfilePhoto', { name: member.name })}
               >
                 <td className="td-name">
                   <div className="member-name-cell">
@@ -102,7 +104,7 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
                 <td className="td-joined">{formatDate(member.join_date)}</td>
                 <td className="td-trainer">{member.wants_trainer ? 'Yes' : 'No'}</td>
                 <td className="td-status">
-                  <span className="member-status-badge">Active</span>
+                  <span className="member-status-badge">{t('active')}</span>
                 </td>
               </tr>
             ))}
@@ -115,7 +117,7 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
           className="member-detail-modal"
           role="dialog"
           aria-modal="true"
-          aria-label={`${selectedMember.name} details`}
+          aria-label={t('memberPhotoProfile', { name: selectedMember.name })}
           onClick={e => {
             if (e.target === e.currentTarget) setSelectedMember(null)
           }}

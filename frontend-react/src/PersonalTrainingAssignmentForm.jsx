@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { personalTrainingAssignmentSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { Activity, CalendarDays, Check, Dumbbell, UserRound, Users } from 'lucid
 import FeedbackMessage from './FeedbackMessage'
 
 function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated }) {
+  const { t } = useTranslation(['people', 'common'])
   const [trainers, setTrainers] = useState([])
   const [members, setMembers] = useState([])
   const [trainerId, setTrainerId] = useState('')
@@ -26,17 +28,17 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           if (!response.ok) throw new Error('Failed to load trainers')
           return response.json()
         })
-        .then(setTrainers)
-        .catch(() => setLookupError('Unable to load trainers or members. Please try again.')),
+        .then(data => setTrainers(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadTrainersMembersFailed'))),
       authFetch(`${API_URL}/members`)
         .then(response => {
           if (!response.ok) throw new Error('Failed to load members')
           return response.json()
         })
-        .then(setMembers)
-        .catch(() => setLookupError('Unable to load trainers or members. Please try again.'))
+        .then(data => setMembers(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadTrainersMembersFailed')))
     ]).finally(() => setLoadingOptions(false))
-  }, [])
+  }, [t])
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -69,7 +71,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create personal training assignment.')
+        if (!response.ok) throw new Error(data.error || t('assignmentCreateFailed'))
         return data
       })
       .then(() => {
@@ -80,8 +82,8 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
         setStatus('')
         onPersonalTrainingAssignmentCreated()
       })
-      .then(() => setFeedback({ type: 'success', message: 'Personal training assignment created successfully.' }))
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create personal training assignment.' }))
+      .then(() => setFeedback({ type: 'success', message: t('assignmentCreated') }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('assignmentCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
@@ -92,8 +94,8 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           <Activity size={19} />
         </div>
         <div>
-          <h2>Assign Personal Training</h2>
-          <p>Pair a member with a trainer and define the coaching engagement.</p>
+          <h2>{t('assignTraining')}</h2>
+          <p>{t('pairMemberHelp')}</p>
         </div>
       </div>
 
@@ -101,11 +103,11 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
         <FeedbackMessage message={lookupError} />
         <div className="pt-assignment-form-grid">
           <label className="pt-assignment-field">
-            <span>Trainer</span>
+            <span>{t('trainer', { ns: 'common' })}</span>
             <div className="pt-assignment-input-wrap">
               <Dumbbell size={16} />
               <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
-                <option value="">Select a trainer</option>
+                <option value="">{t('selectTrainer', { ns: 'common' })}</option>
                 {trainers.map(trainer => (
                   <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
                 ))}
@@ -115,11 +117,11 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           </label>
 
           <label className="pt-assignment-field">
-            <span>Member</span>
+            <span>{t('member', { ns: 'common' })}</span>
             <div className="pt-assignment-input-wrap">
               <UserRound size={16} />
               <select value={memberId} onChange={e => setMemberId(e.target.value)} required>
-                <option value="">Select a member</option>
+                <option value="">{t('selectMember', { ns: 'common' })}</option>
                 {members.map(member => (
                   <option key={member.member_id} value={member.member_id}>{member.name}</option>
                 ))}
@@ -129,15 +131,15 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           </label>
 
           <label className="pt-assignment-field">
-            <span>Speciality</span>
+            <span>{t('speciality')}</span>
             <div className="pt-assignment-input-wrap">
               <Users size={16} />
-              <input type="text" value={speciality} onChange={e => setSpeciality(e.target.value)} required placeholder="e.g. Strength training" />
+              <input type="text" value={speciality} onChange={e => setSpeciality(e.target.value)} required placeholder={t('specialityPlaceholder')} />
             </div>
           </label>
 
           <label className="pt-assignment-field">
-            <span>Start date</span>
+            <span>{t('startDate')}</span>
             <div className="pt-assignment-input-wrap">
               <CalendarDays size={16} />
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required />
@@ -146,15 +148,15 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
           </label>
 
           <label className="pt-assignment-field">
-            <span>Status</span>
+            <span>{t('status', { ns: 'common' })}</span>
             <div className="pt-assignment-input-wrap">
               <Activity size={16} />
               <select value={status} onChange={e => setStatus(e.target.value)} required>
-                <option value="">Select status</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="">{t('selectStatus')}</option>
+                <option value="active">{t('active')}</option>
+                <option value="paused">{t('paused')}</option>
+                <option value="completed">{t('completed')}</option>
+                <option value="cancelled">{t('cancelled')}</option>
               </select>
             </div>
           </label>
@@ -163,7 +165,7 @@ function PersonalTrainingAssignmentForm({ onPersonalTrainingAssignmentCreated })
         <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="pt-assignment-form-actions">
           <button type="submit" className="pt-assignment-primary-button" disabled={submitting || loadingOptions}>
-            <Check size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Assignment'}
+            <Check size={16} /> {submitting ? t('creating') : loadingOptions ? t('loadingOptions') : t('addAssignment')}
           </button>
         </div>
       </form>

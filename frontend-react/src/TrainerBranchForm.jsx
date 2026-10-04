@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { trainerBranchSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { GitBranch, MapPin, Save, UserRound } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function TrainerBranchForm({ onTrainerBranchCreated }) {
+  const { t } = useTranslation(['people', 'common'])
   const [trainers, setTrainers] = useState([])
   const [branches, setBranches] = useState([])
   const [trainerId, setTrainerId] = useState('')
@@ -23,17 +25,17 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
           if (!response.ok) throw new Error('Failed to load trainers')
           return response.json()
         })
-        .then(setTrainers)
-        .catch(() => setLookupError('Unable to load trainers or branches. Please try again.')),
+        .then(data => setTrainers(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed'))),
       authFetch(`${API_URL}/branches`)
         .then(response => {
           if (!response.ok) throw new Error('Failed to load branches')
           return response.json()
         })
-        .then(setBranches)
-        .catch(() => setLookupError('Unable to load trainers or branches. Please try again.'))
+        .then(data => setBranches(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed')))
     ]).finally(() => setLoadingOptions(false))
-  }, [])
+  }, [t])
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -63,7 +65,7 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create trainer branch link.')
+        if (!response.ok) throw new Error(data.error || t('trainerBranchLinkCreateFailed'))
         return data
       })
       .then(() => {
@@ -71,23 +73,60 @@ function TrainerBranchForm({ onTrainerBranchCreated }) {
         setBranchId('')
         onTrainerBranchCreated()
       })
-      .then(() => setFeedback({ type: 'success', message: 'Trainer branch link created successfully.' }))
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create trainer branch link.' }))
+      .then(() => setFeedback({ type: 'success', message: t('trainerBranchLinkCreated') }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('trainerBranchLinkCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
   return (
-    <section className="trainer-branch-form-section"><div className="trainer-branch-form-heading"><div className="trainer-branch-form-icon"><GitBranch size={19} /></div><div><h2>Link Trainer to Branch</h2><p>Define where a trainer is available to coach.</p></div></div><form className="trainer-branch-form" onSubmit={handleSubmit}><FeedbackMessage message={lookupError} /><div className="trainer-branch-form-grid"><label className="trainer-branch-field"><span>Trainer</span><div className="trainer-branch-input-wrap"><UserRound size={16} /><select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
-        <option value="">-- Select a trainer --</option>
-        {trainers.map(trainer => (
-          <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
-        ))}
-      </select></div>{errors.trainerId && <small className="trainer-branch-field-error">{errors.trainerId}</small>}</label><label className="trainer-branch-field"><span>Branch</span><div className="trainer-branch-input-wrap"><MapPin size={16} /><select value={branchId} onChange={e => setBranchId(e.target.value)} required>
-        <option value="">-- Select a branch --</option>
-        {branches.map(branch => (
-          <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
-        ))}
-      </select></div>{errors.branchId && <small className="trainer-branch-field-error">{errors.branchId}</small>}</label></div><FeedbackMessage message={feedback?.message} type={feedback?.type} /><div className="trainer-branch-form-actions"><button type="submit" className="trainer-branch-primary-button" disabled={submitting || loadingOptions}><Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Link'}</button></div></form></section>
+    <section className="trainer-branch-form-section">
+      <div className="trainer-branch-form-heading">
+        <div className="trainer-branch-form-icon">
+          <GitBranch size={19} />
+        </div>
+        <div>
+          <h2>{t('linkTrainer')}</h2>
+          <p>{t('defineTrainerBranch')}</p>
+        </div>
+      </div>
+      <form className="trainer-branch-form" onSubmit={handleSubmit}>
+        <FeedbackMessage message={lookupError} />
+        <div className="trainer-branch-form-grid">
+          <label className="trainer-branch-field">
+            <span>{t('trainer', { ns: 'common' })}</span>
+            <div className="trainer-branch-input-wrap">
+              <UserRound size={16} />
+              <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
+                <option value="">{t('selectTrainer')}</option>
+                {trainers.map(trainer => (
+                  <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
+                ))}
+              </select>
+            </div>
+            {errors.trainerId && <small className="trainer-branch-field-error">{errors.trainerId}</small>}
+          </label>
+          <label className="trainer-branch-field">
+            <span>{t('branch', { ns: 'common' })}</span>
+            <div className="trainer-branch-input-wrap">
+              <MapPin size={16} />
+              <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
+                <option value="">{t('selectBranch')}</option>
+                {branches.map(branch => (
+                  <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+            {errors.branchId && <small className="trainer-branch-field-error">{errors.branchId}</small>}
+          </label>
+        </div>
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
+        <div className="trainer-branch-form-actions">
+          <button type="submit" className="trainer-branch-primary-button" disabled={submitting || loadingOptions}>
+            <Save size={16} /> {submitting ? t('creating') : loadingOptions ? t('loadingOptions') : t('addLink')}
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

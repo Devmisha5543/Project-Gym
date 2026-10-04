@@ -23,29 +23,30 @@ import {
 import { useGym, GymBrandMark } from './GymContext'
 import { useTheme } from './ThemeContext'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { useTranslation } from 'react-i18next'
 
 const primaryNav = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/members', label: 'Members', icon: Users },
-  { path: '/branches', label: 'Branches', icon: Building2 },
-  { path: '/trainers', label: 'Trainers', icon: Dumbbell },
+  { path: '/dashboard', label: 'dashboard', icon: LayoutDashboard },
+  { path: '/analytics', label: 'analytics', icon: BarChart3 },
+  { path: '/members', label: 'members', icon: Users },
+  { path: '/branches', label: 'branches', icon: Building2 },
+  { path: '/trainers', label: 'trainers', icon: Dumbbell },
 ]
 
 const moreRoutes = [
-  { path: '/membershipplans', label: 'Membership Plans', icon: CreditCard },
+  { path: '/membershipplans', label: 'membershipPlans', icon: CreditCard },
   {
     path: '/personaltrainingassignments',
-    label: 'Personal Training',
+    label: 'personalTraining',
     icon: Dumbbell,
   },
-  { path: '/classes', label: 'Classes', icon: Calendar },
-  { path: '/classbookings', label: 'Class Bookings', icon: CalendarCheck },
-  { path: '/payments', label: 'Payments', icon: Receipt },
-  { path: '/equipment', label: 'Equipment', icon: Layers },
-  { path: '/trainerbranch', label: 'Trainer Branch', icon: GitBranch },
-  { path: '/admins', label: 'Admin', icon: Shield },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/classes', label: 'classes', icon: Calendar },
+  { path: '/classbookings', label: 'classBookings', icon: CalendarCheck },
+  { path: '/payments', label: 'payments', icon: Receipt },
+  { path: '/equipment', label: 'equipment', icon: Layers },
+  { path: '/trainerbranch', label: 'trainerBranch', icon: GitBranch },
+  { path: '/admins', label: 'admin', icon: Shield },
+  { path: '/settings', label: 'settings', icon: Settings },
 ]
 
 function subscribeToMedia(callback) {
@@ -63,6 +64,7 @@ function getMobileServerSnapshot() {
 }
 
 export default function MobileNavigation({ onLogout }) {
+  const { t } = useTranslation('navigation')
   const isMobile = useSyncExternalStore(
     subscribeToMedia,
     getMobileSnapshot,
@@ -113,19 +115,19 @@ export default function MobileNavigation({ onLogout }) {
         <div className="mobile-header-brand">
           <GymBrandMark logoUrl={gym?.logo_url} name={gymName} />
           <div className="brand-text">
-            <h2>{gymLoading ? 'Loading...' : gymName}</h2>
-            <span>Management</span>
+            <h2>{gymLoading ? t('common:loading') : gymName}</h2>
+            <span>{t('managementLabel')}</span>
           </div>
         </div>
 
         <div className="mobile-header-profile">
           <div className="admin-avatar">A</div>
-          <span className="mobile-admin-badge">Admin</span>
+          <span className="mobile-admin-badge">{t('admin')}</span>
         </div>
       </header>
 
       {/* MOBILE BOTTOM NAVIGATION */}
-      <nav className="mobile-bottom-nav" aria-label="Mobile Navigation">
+      <nav className="mobile-bottom-nav" aria-label={t('mobileNavigation')}>
         {primaryNav.map((item) => {
           const Icon = item.icon
           return (
@@ -139,7 +141,7 @@ export default function MobileNavigation({ onLogout }) {
               {({ isActive }) => (
                 <>
                   <Icon size={20} className="mobile-tab-icon" />
-                  <span className="mobile-tab-label">{item.label}</span>
+                  <span className="mobile-tab-label">{t(item.label)}</span>
                   {isActive && <span className="mobile-tab-dot" />}
                 </>
               )}
@@ -153,11 +155,11 @@ export default function MobileNavigation({ onLogout }) {
             moreOpen || isMoreActive ? 'active' : ''
           }`}
           onClick={() => setMoreOpen((prev) => !prev)}
-          aria-label="More navigation options"
+          aria-label={t('moreNavigationOptions')}
           aria-expanded={moreOpen}
         >
           <MoreHorizontal size={20} className="mobile-tab-icon" />
-          <span className="mobile-tab-label">More</span>
+          <span className="mobile-tab-label">{t('more')}</span>
           {(moreOpen || isMoreActive) && <span className="mobile-tab-dot" />}
         </button>
       </nav>
@@ -186,7 +188,7 @@ export default function MobileNavigation({ onLogout }) {
               className="mobile-more-sheet"
               role="dialog"
               aria-modal="true"
-              aria-label="More navigation menu"
+              aria-label={t('moreNavigationMenu')}
               initial={{ y: reduceMotion ? 0 : '100%' }}
               animate={{ y: 0 }}
               exit={{ y: reduceMotion ? 0 : '100%' }}
@@ -195,12 +197,12 @@ export default function MobileNavigation({ onLogout }) {
             <div className="mobile-sheet-drag-handle" />
 
             <div className="mobile-sheet-header">
-              <h3>More Options</h3>
+              <h3>{t('moreOptions')}</h3>
               <button
                 type="button"
                 className="mobile-sheet-close"
                 onClick={() => setMoreOpen(false)}
-                aria-label="Close menu"
+                aria-label={t('common:close')}
               >
                 <X size={18} />
               </button>
@@ -219,7 +221,7 @@ export default function MobileNavigation({ onLogout }) {
                     onClick={() => setMoreOpen(false)}
                   >
                     <Icon size={18} className="mobile-sheet-icon" />
-                    <span className="mobile-sheet-label">{route.label}</span>
+                    <span className="mobile-sheet-label">{t(route.label)}</span>
                   </NavLink>
                 )
               })}
@@ -234,7 +236,7 @@ export default function MobileNavigation({ onLogout }) {
                   ? <Sun size={18} className="mobile-sheet-icon" />
                   : <Moon size={18} className="mobile-sheet-icon" />}
                 <span className="mobile-sheet-label">
-                  {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                  {t(theme === 'dark' ? 'lightMode' : 'darkMode')}
                 </span>
               </button>
 
@@ -249,7 +251,7 @@ export default function MobileNavigation({ onLogout }) {
                 }}
               >
                 <LogOut size={18} className="mobile-sheet-icon" />
-                <span className="mobile-sheet-label">Logout</span>
+                <span className="mobile-sheet-label">{t('logout')}</span>
               </button>
             </div>
             </motion.div>

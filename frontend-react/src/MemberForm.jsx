@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { memberSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -11,6 +12,7 @@ import {
 import FeedbackMessage from './FeedbackMessage'
 
 function MemberForm({ onMemberCreated }) {
+  const { t } = useTranslation(['members', 'common', 'people'])
   const [branches, setBranches] = useState([])
   const [plans, setPlans] = useState([])
 
@@ -51,12 +53,12 @@ function MemberForm({ onMemberCreated }) {
       .catch(error => {
         console.error('Failed to load branches:', error)
         setBranches([])
-        setLookupError('Unable to load branches. Please try again.')
+        setLookupError(t('branchLoadFailed', { ns: 'people', defaultValue: 'Unable to load branches. Please try again.' }))
       })
       .finally(() => {
         setLoadingBranches(false)
       })
-  }, [])
+  }, [t])
 
   useEffect(() => {
     authFetch(`${API_URL}/membershipplans`)
@@ -77,12 +79,12 @@ function MemberForm({ onMemberCreated }) {
         )
 
         setPlans([])
-        setLookupError('Unable to load membership plans. Please try again.')
+        setLookupError(t('loadFailed', { defaultValue: 'Unable to load membership plans. Please try again.' }))
       })
       .finally(() => {
         setLoadingPlans(false)
       })
-  }, [])
+  }, [t])
 
   function handlePhotoChange(event) {
     const file = event.target.files[0]
@@ -150,7 +152,7 @@ function MemberForm({ onMemberCreated }) {
 
     if (!branchId) {
       setErrors({
-        branch: 'Please select a branch.'
+        branch: t('branchRequired')
       })
 
       return
@@ -158,7 +160,7 @@ function MemberForm({ onMemberCreated }) {
 
     if (!gender) {
       setErrors({
-        gender: 'Please select a gender.'
+        gender: t('genderRequired')
       })
 
       return
@@ -166,7 +168,7 @@ function MemberForm({ onMemberCreated }) {
 
     if (!planId) {
       setErrors({
-        plan: 'Please select a membership plan.'
+        plan: t('planRequired')
       })
 
       return
@@ -174,7 +176,7 @@ function MemberForm({ onMemberCreated }) {
 
     if (loadingBranches || loadingPlans) {
       setErrors({
-        general: 'Member options are still loading. Please wait.'
+        general: t('memberOptionsLoading')
       })
 
       return
@@ -218,7 +220,7 @@ function MemberForm({ onMemberCreated }) {
       if (!memberResponse.ok) {
         throw new Error(
           memberData.error ||
-          'Failed to create member.'
+          t('createFailed')
         )
       }
 
@@ -229,7 +231,7 @@ function MemberForm({ onMemberCreated }) {
       }
 
       setOpen(false)
-      setSuccessMessage('Member created successfully.')
+      setSuccessMessage(t('memberCreated'))
 
     } catch (error) {
       console.error(
@@ -240,7 +242,7 @@ function MemberForm({ onMemberCreated }) {
       setErrors({
         general:
           error.message ||
-          'Unable to create member. Please try again.'
+          t('createFailed')
       })
 
     } finally {
@@ -265,10 +267,10 @@ function MemberForm({ onMemberCreated }) {
           </div>
 
           <div>
-            <strong>Add New Member</strong>
+            <strong>{t('addNewMember')}</strong>
 
             <span>
-              Register a new gym member
+              {t('registerNewMember')}
             </span>
           </div>
 
@@ -302,7 +304,7 @@ function MemberForm({ onMemberCreated }) {
             {/* Branch */}
             <div className="form-field">
 
-              <label>Branch</label>
+              <label>{t('branch')}</label>
 
               <select
                 value={branchId}
@@ -311,7 +313,7 @@ function MemberForm({ onMemberCreated }) {
               >
 
                 <option value="">
-                  Select a branch
+                  {t('selectBranch', { ns: 'common' })}
                 </option>
 
                 {branches.map(branch => (
@@ -336,11 +338,11 @@ function MemberForm({ onMemberCreated }) {
             {/* Full Name */}
             <div className="form-field">
 
-              <label>Full Name</label>
+              <label>{t('fullName')}</label>
 
               <input
                 type="text"
-                placeholder="Enter member name"
+                placeholder={t('memberNamePlaceholder')}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -357,7 +359,7 @@ function MemberForm({ onMemberCreated }) {
             {/* Gender */}
             <div className="form-field">
 
-              <label>Gender</label>
+              <label>{t('gender')}</label>
 
               <select
                 value={gender}
@@ -366,15 +368,15 @@ function MemberForm({ onMemberCreated }) {
               >
 
                 <option value="">
-                  Select gender
+                  {t('selectGender')}
                 </option>
 
                 <option value="Male">
-                  Male
+                  {t('male')}
                 </option>
 
                 <option value="Female">
-                  Female
+                  {t('female')}
                 </option>
 
               </select>
@@ -390,7 +392,7 @@ function MemberForm({ onMemberCreated }) {
             {/* Phone */}
             <div className="form-field">
 
-              <label>Phone</label>
+              <label>{t('phone', { ns: 'common' })}</label>
 
               <input
                 type="text"
@@ -411,11 +413,11 @@ function MemberForm({ onMemberCreated }) {
             {/* Address */}
             <div className="form-field">
 
-              <label>Address</label>
+              <label>{t('address', { ns: 'common' })}</label>
 
               <input
                 type="text"
-                placeholder="Member address"
+                placeholder={t('memberAddressPlaceholder')}
                 value={address}
                 onChange={e => setAddress(e.target.value)}
                 required
@@ -426,7 +428,7 @@ function MemberForm({ onMemberCreated }) {
             {/* Join Date */}
             <div className="form-field">
 
-              <label>Join Date</label>
+              <label>{t('joinDate')}</label>
 
               <input
                 type="date"
@@ -440,7 +442,7 @@ function MemberForm({ onMemberCreated }) {
             {/* Membership Plan */}
             <div className="form-field">
 
-              <label>Membership Plan</label>
+              <label>{t('membershipPlan')}</label>
 
               <select
                 value={planId}
@@ -451,8 +453,8 @@ function MemberForm({ onMemberCreated }) {
 
                 <option value="">
                   {loadingPlans
-                    ? 'Loading membership plans...'
-                    : 'Select a membership plan'}
+                    ? t('loadingMembershipPlans')
+                    : t('selectPlan')}
                 </option>
 
                 {plans.map(plan => (
@@ -490,7 +492,7 @@ function MemberForm({ onMemberCreated }) {
               />
 
               <span>
-                Member wants a personal trainer
+                {t('wantsPersonalTrainer')}
               </span>
 
             </label>
@@ -502,7 +504,7 @@ function MemberForm({ onMemberCreated }) {
               <span>
                 {photo
                   ? photo.name
-                  : 'Upload profile photo'}
+                  : t('uploadProfilePhoto')}
               </span>
 
               <input
@@ -522,7 +524,7 @@ function MemberForm({ onMemberCreated }) {
 
               <img
                 src={photoPreview}
-                alt="Preview"
+                alt={t('photoPreview')}
               />
 
               <button
@@ -547,7 +549,7 @@ function MemberForm({ onMemberCreated }) {
               }}
               disabled={submitting}
             >
-              Cancel
+              {t('cancel', { ns: 'common' })}
             </button>
 
             <button
@@ -556,8 +558,8 @@ function MemberForm({ onMemberCreated }) {
               disabled={submitting || loadingBranches || loadingPlans}
             >
               {submitting
-                ? 'Registering Member...'
-                : 'Add Member'}
+                ? t('creatingMember')
+                : t('addMember')}
             </button>
 
           </div>

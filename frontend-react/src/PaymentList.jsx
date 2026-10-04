@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CalendarDays,
   CreditCard,
@@ -12,8 +13,8 @@ import { API_URL } from './config'
 import { authFetch } from './authFetch'
 
 function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
+  const { t } = useTranslation(['payments', 'common'])
   const [editingId, setEditingId] = useState(null)
-
   const [memberships, setMemberships] = useState([])
 
   const [editMembershipId, setEditMembershipId] = useState('')
@@ -34,9 +35,9 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       .then(data => setMemberships(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load memberships:', error)
-        setOperationError('Unable to load memberships needed to edit payments.')
+        setOperationError(t('membershipsLoadFailed'))
       })
-  }, [])
+  }, [t])
 
   function startEditing(payment) {
     setOperationError('')
@@ -90,7 +91,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Failed to update payment.')
+        if (!response.ok) throw new Error(data.error || t('paymentUpdateFailed'))
         return data
       })
       .then(() => {
@@ -99,7 +100,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update payment:', error)
-        setOperationError(error.message || 'Unable to update payment. Please try again.')
+        setOperationError(error.message || t('paymentUpdateFailed'))
       })
       .finally(() => {
         setSaving(false)
@@ -108,7 +109,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   function handleDelete(paymentId) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete Payment #${paymentId}?`
+      t('deletePaymentConfirm', { id: paymentId })
     )
 
     if (!confirmed) return
@@ -121,7 +122,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Failed to delete payment.')
+        if (!response.ok) throw new Error(data.error || t('paymentDeleteFailed'))
         return data
       })
       .then(() => {
@@ -129,7 +130,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .catch(error => {
         console.error('Failed to delete payment:', error)
-        setOperationError(error.message || 'Unable to delete payment. Please try again.')
+        setOperationError(error.message || t('paymentDeleteFailed'))
       })
       .finally(() => {
         setDeletingId(null)
@@ -143,11 +144,8 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
           <CreditCard size={25} />
         </div>
 
-        <h3>No payments recorded</h3>
-
-        <p>
-          Record your first membership payment above to see it here.
-        </p>
+        <h3>{t('noPayments')}</h3>
+        <p>{t('noPaymentsDescription')}</p>
       </div>
     )
   }
@@ -179,7 +177,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                 <div className="payment-edit-grid">
 
                   <label className="payment-field">
-                    <span>Membership</span>
+                    <span>{t('membership', { defaultValue: 'Membership' })}</span>
 
                     <div className="payment-input-wrap">
                       <CreditCard size={16} />
@@ -195,10 +193,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                             key={membership.membership_id}
                             value={membership.membership_id}
                           >
-                            Membership #{membership.membership_id}
-                            {' '}(
-                            Member {membership.member_id}
-                            )
+                            {t('membershipLabel', { id: membership.membership_id })} ({t('memberLabel', { id: membership.member_id })})
                           </option>
                         ))}
                       </select>
@@ -206,7 +201,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                   </label>
 
                   <label className="payment-field">
-                    <span>Amount</span>
+                    <span>{t('amount')}</span>
 
                     <div className="payment-input-wrap">
                       <CreditCard size={16} />
@@ -223,7 +218,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                   </label>
 
                   <label className="payment-field">
-                    <span>Payment date</span>
+                    <span>{t('paymentDate')}</span>
 
                     <div className="payment-input-wrap">
                       <CalendarDays size={16} />
@@ -239,7 +234,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                   </label>
 
                   <label className="payment-field">
-                    <span>Payment method</span>
+                    <span>{t('paymentMethod')}</span>
 
                     <div className="payment-input-wrap">
                       <FileText size={16} />
@@ -269,8 +264,8 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                     <Save size={15} />
 
                     {saving
-                      ? 'Saving...'
-                      : 'Save Changes'}
+                      ? t('saving', { ns: 'common' })
+                      : t('saveChanges', { ns: 'common' })}
                   </button>
 
                   <button
@@ -280,7 +275,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                     disabled={saving}
                   >
                     <X size={15} />
-                    Cancel
+                    {t('cancel', { ns: 'common' })}
                   </button>
 
                 </div>
@@ -295,7 +290,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
                   <div>
                     <span className="payment-card-label">
-                      Payment #{payment.payment_id}
+                      {t('paymentCardLabel', { id: payment.payment_id })}
                     </span>
 
                     <h2>
@@ -314,7 +309,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
                   <span>
                     <CreditCard size={15} />
-                    Membership #{payment.membership_id}
+                    {t('membershipLabel', { id: payment.membership_id })}
                   </span>
 
                   <span>
@@ -332,7 +327,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                     onClick={() => startEditing(payment)}
                   >
                     <Pencil size={15} />
-                    Edit
+                    {t('edit', { ns: 'common' })}
                   </button>
 
                   <button
@@ -348,8 +343,8 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
                     <Trash2 size={15} />
 
                     {deletingId === payment.payment_id
-                      ? 'Deleting...'
-                      : 'Delete'}
+                      ? t('deleting', { ns: 'common' })
+                      : t('delete', { ns: 'common' })}
                   </button>
 
                 </div>

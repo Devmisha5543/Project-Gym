@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import FeedbackMessage from './FeedbackMessage'
-import {authFetch } from './authFetch'
+import { authFetch } from './authFetch'
 import { useGym } from './GymContext'
 import MemberDetail from './MemberDetail'
 import MemberPhoto from './MemberPhoto'
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 
 function DashboardPage() {
+  const { t, i18n } = useTranslation(['analytics', 'common'])
   const navigate = useNavigate()
   const { gym } = useGym()
   const [expiring, setExpiring] = useState([])
@@ -30,7 +32,7 @@ function DashboardPage() {
   const [selectedMembership, setSelectedMembership] = useState(null)
   const [branches, setBranches] = useState([])
 
-  function loadDashboard() {
+  const loadDashboard = useCallback(() => {
     setLoading(true)
     setLoadError('')
 
@@ -59,21 +61,36 @@ function DashboardPage() {
             ? expiringMemberships
             : []
         )
-          setBranches(Array.isArray(branchData) ? branchData : [])
+        setBranches(Array.isArray(branchData) ? branchData : [])
       })
       .catch(error => {
         console.error('Dashboard loading error:', error)
-        setLoadError('Unable to load dashboard data. Please try again.')
+        setLoadError(t('unexpectedError', { ns: 'common' }))
       })
       .finally(() => {
         setLoading(false)
       })
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadDashboard, 0)
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadDashboard])
+
+  function getExpiryStatus(endDate) {
+    if (!endDate) return { label: t('dateUnavailable'), className: '' }
+
+    const [year, month, day] = endDate.split('-').map(Number)
+    const today = new Date()
+    const daysRemaining = Math.ceil((
+      Date.UTC(year, month - 1, day) -
+      Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+    ) / 86400000)
+
+    if (daysRemaining < 0) return { label: t('membershipExpired'), className: 'expiry-status-expired' }
+    if (daysRemaining <= 3) return { label: t('dueSoon'), className: 'expiry-status-soon' }
+    return { label: t('oneWeekLeft'), className: 'expiry-status-week' }
+  }
 
   return (
     <div className="dashboard">
@@ -83,15 +100,15 @@ function DashboardPage() {
 
         <div>
           <p className="dashboard-eyebrow">
-            OVERVIEW
+            {t('overview')}
           </p>
 
           <h1>
-            View of your gym's activity and performance.
+            {t('dashboardSubtitle')}
           </h1>
 
           <p className="dashboard-subtitle">
-            Gym operations at a glance.
+            {t('dashboardGlance')}
           </p>
         </div>
 
@@ -101,7 +118,7 @@ function DashboardPage() {
           disabled={loading}
         >
           <RefreshCw size={15} className={loading ? 'refresh-icon-spinning' : ''} />
-          {loading ? 'Refreshing...' : 'Refresh data'}
+          {loading ? t('refreshing') : t('refreshData')}
         </button>
 
       </section>
@@ -115,7 +132,7 @@ function DashboardPage() {
         <div className="dashboard-stat-card">
           <div className="stat-top">
             <span className="stat-title">
-              Active Members
+              {t('activeMembers')}
             </span>
 
             <span className="stat-icon">
@@ -128,7 +145,7 @@ function DashboardPage() {
           </div>
 
           <p className="stat-description">
-            Registered gym members
+            {t('registeredMembers')}
           </p>
         </div>
 
@@ -136,7 +153,7 @@ function DashboardPage() {
         <div className="dashboard-stat-card">
           <div className="stat-top">
             <span className="stat-title">
-              Scheduled Classes
+              {t('scheduledClasses')}
             </span>
 
             <span className="stat-icon">
@@ -149,7 +166,7 @@ function DashboardPage() {
           </div>
 
           <p className="stat-description">
-            Classes currently scheduled
+            {t('classesCurrentlyScheduled')}
           </p>
         </div>
 
@@ -157,7 +174,7 @@ function DashboardPage() {
         <div className="dashboard-stat-card revenue-card">
           <div className="stat-top">
             <span className="stat-title">
-              Total Revenue
+              {t('totalRevenue')}
             </span>
 
             <span className="stat-icon">
@@ -168,7 +185,7 @@ function DashboardPage() {
           <div className="stat-number">
             {loading
               ? '—'
-              : new Intl.NumberFormat('en-US', {
+              : new Intl.NumberFormat(i18n.language === 'am' ? 'am-ET' : 'en-US', {
                   style: 'currency',
                   currency: gym?.currency || 'ETB',
                 }).format(totalRevenue)
@@ -176,7 +193,7 @@ function DashboardPage() {
          </div>
 
           <p className="stat-description">
-            Total recorded payments
+            {t('totalRecordedPayments')}
           </p>
         </div>
 
@@ -189,11 +206,11 @@ function DashboardPage() {
         <div className="section-heading">
           <div>
             <p className="dashboard-eyebrow">
-              SHORTCUTS
+              {t('shortcuts')}
             </p>
 
             <h2>
-              Quick Actions
+              {t('quickActions')}
             </h2>
           </div>
         </div>
@@ -210,8 +227,8 @@ function DashboardPage() {
             </span>
 
             <div>
-              <strong>Add Member</strong>
-              <span>Register a new member</span>
+              <strong>{t('addMember')}</strong>
+              <span>{t('registerNewMember')}</span>
             </div>
           </a>
 
@@ -225,8 +242,8 @@ function DashboardPage() {
             </span>
 
             <div>
-              <strong>Record Payment</strong>
-              <span>Add a new payment</span>
+              <strong>{t('recordPayment')}</strong>
+              <span>{t('addNewPayment')}</span>
             </div>
           </a>
 
@@ -240,8 +257,8 @@ function DashboardPage() {
             </span>
 
             <div>
-              <strong>Manage Classes</strong>
-              <span>View and manage classes</span>
+              <strong>{t('manageClasses')}</strong>
+              <span>{t('viewManageClasses')}</span>
             </div>
           </a>
 
@@ -255,8 +272,8 @@ function DashboardPage() {
             </span>
 
             <div>
-              <strong>Equipment</strong>
-              <span>Manage gym equipment</span>
+              <strong>{t('equipment')}</strong>
+              <span>{t('manageGymEquipment')}</span>
             </div>
           </a>
 
@@ -272,15 +289,15 @@ function DashboardPage() {
 
           <div>
             <p className="dashboard-eyebrow">
-              <Activity size={13} /> ATTENTION NEEDED
+              <Activity size={13} /> {t('attentionNeeded')}
             </p>
 
             <h2>
-              Memberships Expiring Soon
+              {t('expiringSoonTitle')}
             </h2>
 
             <p className="section-description">
-              Expired memberships and memberships expiring within the next 7 days.
+              {t('expiringSoonDescription')}
             </p>
           </div>
 
@@ -288,7 +305,7 @@ function DashboardPage() {
             href="/members"
             className="view-all"
           >
-            View members →
+            {t('viewMembers')}
           </a>
 
         </div>
@@ -302,7 +319,7 @@ function DashboardPage() {
               <div className="loading-dot"></div>
 
               <p>
-                Loading membership information...
+                {t('loadingMemberships')}
               </p>
             </div>
 
@@ -315,11 +332,11 @@ function DashboardPage() {
               </div>
 
               <h3>
-                You're all caught up
+                {t('allCaughtUp')}
               </h3>
 
               <p>
-                No memberships are expiring within the next 7 days.
+                {t('noExpiringMemberships')}
               </p>
 
             </div>
@@ -357,7 +374,7 @@ function DashboardPage() {
                     </strong>
 
                     <span>
-                      {membership.member_phone || 'No phone number'}
+                      {membership.member_phone || t('noPhoneNumber')}
                     </span>
 
                   </div>
@@ -367,13 +384,13 @@ function DashboardPage() {
 
                     <span className="expiry-label">
                       {membership.status === 'no_membership'
-                        ? 'Membership'
-                        : 'Expires'}
+                        ? t('membership')
+                        : t('expires')}
                     </span>
 
                     <strong>
                       {membership.status === 'no_membership'
-                        ? 'None'
+                        ? t('none')
                         : membership.end_date}
                     </strong>
 
@@ -391,7 +408,7 @@ function DashboardPage() {
                     className="member-action"
                     onClick={() => setSelectedMembership(membership)}
                   >
-                    View <ArrowUpRight size={14} />
+                    {t('view')} <ArrowUpRight size={14} />
                   </button>
 
                 </div>
@@ -439,21 +456,6 @@ function getMemberPhotoUrl(photo) {
   if (/^(https?:|data:|blob:)/i.test(photo)) return photo
   if (photo.startsWith('/')) return `${API_URL}${photo}`
   return `${API_URL}/uploads/${encodeURIComponent(photo)}`
-}
-
-function getExpiryStatus(endDate) {
-  if (!endDate) return { label: 'Date unavailable', className: '' }
-
-  const [year, month, day] = endDate.split('-').map(Number)
-  const today = new Date()
-  const daysRemaining = Math.ceil((
-    Date.UTC(year, month - 1, day) -
-    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  ) / 86400000)
-
-  if (daysRemaining < 0) return { label: 'Membership expired', className: 'expiry-status-expired' }
-  if (daysRemaining <= 3) return { label: 'Due soon', className: 'expiry-status-soon' }
-  return { label: '1 week left', className: 'expiry-status-week' }
 }
 
 export default DashboardPage

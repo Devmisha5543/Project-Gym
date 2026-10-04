@@ -1,0 +1,21 @@
+export default {
+  required: 'ይህ መስክ ያስፈልጋል።',
+  nameRequired: 'ስም ያስፈልጋል።',
+  nameMin: 'ስም ቢያንስ {{count}} ቁምፊዎች መሆን አለበት።',
+  phoneRequired: 'ስልክ ያስፈልጋል።',
+  phoneDigits: 'የስልክ ቁጥሩ ከ7 እስከ 15 አሃዞች ሊኖሩት ይገባል።',
+  validEmail: 'ትክክለኛ የኢሜይል አድራሻ ሊሆን ይገባል።',
+  validEmailPlease: 'እባክዎ ትክክለኛ የኢሜይል አድራሻ ያስገቡ።',
+  validDate: 'ቀን ያስፈልጋል።',
+  positiveNumber: 'እሴቱ ከ0 በላይ መሆን አለበት።',
+  positiveInteger: 'እሴቱ ከ0 በላይ የሆነ ሙሉ ቁጥር መሆን አለበት።',
+  nonnegativeInteger: 'እሴቱ 0 ወይም ከዚያ በላይ የሆነ ሙሉ ቁጥር መሆን አለበት።',
+  passwordMin: 'የይለፍ ቃሉ ቢያንስ {{count}} ቁምፊዎች መሆን አለበት።',
+  passwordsMatch: 'የይለፍ ቃሎቹ አይዛመዱም።',
+  selectBranch: 'እባክዎ ቅርንጫፍ ይምረጡ።',
+  selectTrainer: 'እባክዎ አሰልጣኝ ይምረጡ።',
+  selectMember: 'እባክዎ አባል ይምረጡ።',
+  selectPlan: 'እባክዎ የአባልነት ዕቅድ ይምረጡ።',
+  checkDetails: 'እባክዎ መረጃውን ያረጋግጡና እንደገና ይሞክሩ።',
+  certificationMin: 'የማረጋገጫው ስም ቢያንስ {{count}} ቁምፊዎች መሆን አለበት።'
+}

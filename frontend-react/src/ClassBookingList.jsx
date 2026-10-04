@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CalendarDays, CalendarCheck, Dumbbell, UserRound, Pencil, Trash2, Save, X } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -8,6 +9,7 @@ function asDateTimeInput(value) {
 }
 
 function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBookingDeleted }) {
+  const { t } = useTranslation(['classes', 'common'])
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ booking_date: '', cancel_date: '', status: '' })
   const [busyId, setBusyId] = useState(null)
@@ -39,33 +41,41 @@ function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBooking
         })
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Failed to update booking.')
+      if (!response.ok) throw new Error(data.error || t('bookingUpdateFailed'))
       setEditingId(null)
       onClassBookingUpdated()
     } catch (err) {
-      setError(err.message || 'Unable to update booking.')
+      setError(err.message || t('bookingUpdateFailed'))
     } finally {
       setBusyId(null)
     }
   }
 
   async function handleDelete(booking) {
-    if (!window.confirm(`Delete booking #${booking.booking_id}?`)) return
+    if (!window.confirm(t('deleteBookingConfirm', { id: booking.booking_id }))) return
     setBusyId(booking.booking_id)
     setError('')
     try {
       const response = await authFetch(`${API_URL}/classbookings/${booking.booking_id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Failed to delete booking.')
+      if (!response.ok) throw new Error(data.error || t('bookingDeleteFailed'))
       onClassBookingDeleted()
     } catch (err) {
-      setError(err.message || 'Unable to delete booking.')
+      setError(err.message || t('bookingDeleteFailed'))
     } finally {
       setBusyId(null)
     }
   }
 
-  if (classBookings.length === 0) return <div className="class-booking-state"><div className="class-booking-state-icon"><CalendarCheck size={25} /></div><h3>No class bookings yet</h3><p>Create a booking above to see reservations here.</p></div>
+  if (classBookings.length === 0) {
+    return (
+      <div className="class-booking-state">
+        <div className="class-booking-state-icon"><CalendarCheck size={25} /></div>
+        <h3>{t('noBookings')}</h3>
+        <p>{t('noBookingsDescription')}</p>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -76,28 +86,33 @@ function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBooking
             <div className="class-booking-card-icon"><CalendarCheck size={20} /></div>
             <div className="class-booking-card-main">
               <div className="class-booking-card-title-row">
-                <div><span className="class-booking-card-label">Booking #{booking.booking_id}</span><h2>Member #{booking.member_id}</h2></div>
-                <span className={`class-booking-status class-booking-status-${String(booking.status || 'unknown').toLowerCase()}`}>{booking.status || 'Status unavailable'}</span>
+                <div>
+                  <span className="class-booking-card-label">{t('bookingCardLabel', { id: booking.booking_id })}</span>
+                  <h2>{t('memberItem', { id: booking.member_id })}</h2>
+                </div>
+                <span className={`class-booking-status class-booking-status-${String(booking.status || 'unknown').toLowerCase()}`}>
+                  {booking.status || t('statusUnavailable')}
+                </span>
               </div>
               <div className="class-booking-card-meta">
-                <span><Dumbbell size={15} />Class #{booking.class_id}</span>
-                <span><UserRound size={15} />Member #{booking.member_id}</span>
+                <span><Dumbbell size={15} />{t('classCardLabel', { id: booking.class_id })}</span>
+                <span><UserRound size={15} />{t('memberItem', { id: booking.member_id })}</span>
                 <span><CalendarDays size={15} />{booking.booking_date}</span>
               </div>
               {editingId === booking.booking_id ? (
                 <div className="class-booking-edit-fields">
-                  <label>Booking date<input type="datetime-local" value={editForm.booking_date} onChange={e => setEditForm({ ...editForm, booking_date: e.target.value })} required /></label>
-                  <label>Cancel date<input type="datetime-local" value={editForm.cancel_date} onChange={e => setEditForm({ ...editForm, cancel_date: e.target.value })} /></label>
-                  <label>Status<select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}><option value="booked">Booked</option><option value="cancelled">Cancelled</option><option value="completed">Completed</option></select></label>
+                  <label>{t('bookingDate')}<input type="datetime-local" value={editForm.booking_date} onChange={e => setEditForm({ ...editForm, booking_date: e.target.value })} required /></label>
+                  <label>{t('cancelDate')}<input type="datetime-local" value={editForm.cancel_date} onChange={e => setEditForm({ ...editForm, cancel_date: e.target.value })} /></label>
+                  <label>{t('status', { ns: 'common' })}<select value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })}><option value="booked">{t('booked')}</option><option value="cancelled">{t('cancelled')}</option><option value="completed">{t('completed')}</option></select></label>
                   <div className="equipment-card-actions">
-                    <button type="button" className="equipment-primary-button" onClick={() => handleUpdate(booking)} disabled={busyId === booking.booking_id}><Save size={15} />Save</button>
-                    <button type="button" className="equipment-secondary-button" onClick={() => setEditingId(null)} disabled={busyId === booking.booking_id}><X size={15} />Cancel</button>
+                    <button type="button" className="equipment-primary-button" onClick={() => handleUpdate(booking)} disabled={busyId === booking.booking_id}><Save size={15} />{t('save', { ns: 'common' })}</button>
+                    <button type="button" className="equipment-secondary-button" onClick={() => setEditingId(null)} disabled={busyId === booking.booking_id}><X size={15} />{t('cancel', { ns: 'common' })}</button>
                   </div>
                 </div>
               ) : (
                 <div className="equipment-card-actions">
-                  <button type="button" className="equipment-secondary-button" onClick={() => startEditing(booking)}><Pencil size={15} />Edit</button>
-                  <button type="button" className="equipment-danger-button" onClick={() => handleDelete(booking)} disabled={busyId === booking.booking_id}><Trash2 size={15} />{busyId === booking.booking_id ? 'Deleting...' : 'Delete'}</button>
+                  <button type="button" className="equipment-secondary-button" onClick={() => startEditing(booking)}><Pencil size={15} />{t('edit', { ns: 'common' })}</button>
+                  <button type="button" className="equipment-danger-button" onClick={() => handleDelete(booking)} disabled={busyId === booking.booking_id}><Trash2 size={15} />{busyId === booking.booking_id ? t('deleting', { ns: 'common' }) : t('delete', { ns: 'common' })}</button>
                 </div>
               )}
             </div>

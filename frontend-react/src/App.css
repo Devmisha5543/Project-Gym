@@ -4423,6 +4423,104 @@
   overflow: hidden;
 }
 
+.settings-language-section {
+  margin-bottom: 20px;
+}
+
+.settings-language-control {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+  padding: 0 24px 24px;
+}
+
+.settings-language-control label {
+  color: var(--text-primary, #f5f2fa);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-language-control p {
+  margin: 0;
+  color: var(--text-muted, #a7a0b3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.settings-language-control select {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid rgba(170, 59, 255, 0.28);
+  border-radius: 10px;
+  background: var(--surface, #15131a);
+  color: inherit;
+  font: inherit;
+}
+
+.settings-language-control select:focus-visible {
+  outline: 2px solid #c48bff;
+  outline-offset: 2px;
+}
+
+html[data-theme="light"] .settings-language-section,
+[data-theme="light"] .settings-language-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  box-shadow: var(--shadow);
+}
+
+html[data-theme="light"] .settings-language-section .settings-form-heading,
+[data-theme="light"] .settings-language-section .settings-form-heading {
+  border-bottom: 1px solid var(--border);
+}
+
+html[data-theme="light"] .settings-language-section .settings-form-icon,
+[data-theme="light"] .settings-language-section .settings-form-icon {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+html[data-theme="light"] .settings-language-section .settings-form-heading h2,
+[data-theme="light"] .settings-language-section .settings-form-heading h2 {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .settings-language-section .settings-form-heading p,
+[data-theme="light"] .settings-language-section .settings-form-heading p {
+  color: var(--text-secondary);
+}
+
+html[data-theme="light"] .settings-language-control label,
+[data-theme="light"] .settings-language-control label {
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .settings-language-control p,
+[data-theme="light"] .settings-language-control p {
+  color: var(--text-muted);
+}
+
+html[data-theme="light"] .settings-language-control select,
+[data-theme="light"] .settings-language-control select {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--text-primary);
+  color-scheme: light;
+}
+
+html[data-theme="light"] .settings-language-control select option,
+[data-theme="light"] .settings-language-control select option {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .settings-language-control select:focus-visible,
+[data-theme="light"] .settings-language-control select:focus-visible {
+  outline-color: var(--accent);
+}
+
 .settings-form-heading {
   display: flex;
   align-items: center;

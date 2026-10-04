@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Building2, MapPin, Phone, Pencil, Trash2, Save, X } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 
 function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
+  const { t } = useTranslation(['people', 'common'])
   const [editingId, setEditingId] = useState(null)
 
   const [editForm, setEditForm] = useState({
@@ -52,22 +54,22 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
 
   async function handleUpdate(branchId) {
     if (!editForm.name.trim()) {
-      setError('Branch name is required.')
+      setError(t('branchNameRequired'))
       return
     }
 
     if (!editForm.address.trim()) {
-      setError('Address is required.')
+      setError(t('addressRequired'))
       return
     }
 
     if (!editForm.phone.trim()) {
-      setError('Phone is required.')
+      setError(t('phoneRequired'))
       return
     }
 
     if (!editForm.city.trim()) {
-      setError('City is required.')
+      setError(t('cityRequired'))
       return
     }
 
@@ -91,7 +93,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update branch.')
+        throw new Error(data.error || t('branchUpdateFailed'))
       }
 
       setEditingId(null)
@@ -101,7 +103,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       }
     } catch (err) {
       console.error('Failed to update branch:', err)
-      setError(err.message || 'Unable to update branch.')
+      setError(err.message || t('branchUpdateFailed'))
     } finally {
       setSaving(false)
     }
@@ -109,7 +111,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
 
   async function handleDelete(branch) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${branch.name}"?`
+      t('deleteBranchConfirm', { name: branch.name })
     )
 
     if (!confirmed) {
@@ -130,7 +132,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete branch.')
+        throw new Error(data.error || t('branchDeleteFailed'))
       }
 
       if (onBranchDeleted) {
@@ -138,7 +140,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       }
     } catch (err) {
       console.error('Failed to delete branch:', err)
-      setError(err.message || 'Unable to delete branch.')
+      setError(err.message || t('branchDeleteFailed'))
     } finally {
       setDeletingId(null)
     }
@@ -151,8 +153,8 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
           <Building2 size={25} />
         </div>
 
-        <h3>No branches yet</h3>
-        <p>Add your first gym location above to get started.</p>
+        <h3>{t('noBranches')}</h3>
+        <p>{t('addBranchHelp')}</p>
       </div>
     )
   }
@@ -182,17 +184,17 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                 <div className="branch-card-title-row">
                   <div>
                     <span className="branch-card-label">
-                      Editing Branch #{branch.branch_id}
+                      {t('editingBranch', { id: branch.branch_id })}
                     </span>
 
-                    <h2>Edit Branch</h2>
+                    <h2>{t('editBranch')}</h2>
                   </div>
                 </div>
 
                 <div className="branch-form-grid">
 
                   <label className="branch-field">
-                    <span>Branch name</span>
+                    <span>{t('branchName')}</span>
 
                     <div className="branch-input-wrap">
                       <Building2 size={16} />
@@ -209,7 +211,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   </label>
 
                   <label className="branch-field">
-                    <span>City</span>
+                    <span>{t('city')}</span>
 
                     <div className="branch-input-wrap">
                       <MapPin size={16} />
@@ -226,7 +228,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   </label>
 
                   <label className="branch-field">
-                    <span>Address</span>
+                    <span>{t('streetAddress')}</span>
 
                     <div className="branch-input-wrap">
                       <MapPin size={16} />
@@ -243,7 +245,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   </label>
 
                   <label className="branch-field">
-                    <span>Phone</span>
+                    <span>{t('branchPhone')}</span>
 
                     <div className="branch-input-wrap">
                       <Phone size={16} />
@@ -271,7 +273,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   >
                     <Save size={16} />
 
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? t('saving', { ns: 'common' }) : t('saveChanges')}
                   </button>
 
                   <button
@@ -281,7 +283,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                     disabled={saving}
                   >
                     <X size={16} />
-                    Cancel
+                    {t('cancel', { ns: 'common' })}
                   </button>
 
                 </div>
@@ -295,14 +297,14 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
 
                   <div>
                     <span className="branch-card-label">
-                      Branch #{branch.branch_id}
+                      {t('branchCardLabel', { id: branch.branch_id })}
                     </span>
 
                     <h2>{branch.name}</h2>
                   </div>
 
                   <span className="branch-status">
-                    Operational
+                    {t('operational')}
                   </span>
 
                 </div>
@@ -312,7 +314,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   <span>
                     <MapPin size={15} />
 
-                    {branch.address || 'Address not provided'}
+                    {branch.address || t('addressNotProvided')}
 
                     {branch.city
                       ? `, ${branch.city}`
@@ -322,7 +324,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                   <span>
                     <Phone size={15} />
 
-                    {branch.phone || 'Phone not provided'}
+                    {branch.phone || t('phoneNotProvided')}
                   </span>
 
                 </div>
@@ -335,7 +337,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                     onClick={() => startEditing(branch)}
                   >
                     <Pencil size={15} />
-                    Edit
+                    {t('edit', { ns: 'common' })}
                   </button>
 
                   <button
@@ -347,8 +349,8 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
                     <Trash2 size={15} />
 
                     {deletingId === branch.branch_id
-                      ? 'Deleting...'
-                      : 'Delete'}
+                      ? t('deleting', { ns: 'common' })
+                      : t('delete', { ns: 'common' })}
                   </button>
 
                 </div>

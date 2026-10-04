@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API_URL } from './config'
 import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 function ForgotPassword() {
+  const { t } = useTranslation('auth')
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -29,17 +31,17 @@ function ForgotPassword() {
       <div className="login-orbit login-orbit-one"></div>
       <div className="login-orbit login-orbit-two"></div>
       <section className="login-card">
-        <div className="login-brand"><div className="login-brand-mark">PG</div><div><strong>Project Gym</strong><span>Management platform</span></div></div>
-        <div className="login-heading"><ShieldCheck size={20} /><span>ACCOUNT RECOVERY</span><h1>Forgot password?</h1><p>Enter your email and we’ll send a reset link if an account matches.</p></div>
+        <div className="login-brand"><div className="login-brand-mark">PG</div><div><strong>Project Gym</strong><span>{t('managementPlatform')}</span></div></div>
+        <div className="login-heading"><ShieldCheck size={20} /><span>{t('accountRecovery')}</span><h1>{t('forgotPasswordTitle')}</h1><p>{t('forgotPasswordDescription')}</p></div>
         {submitted ? (
-          <div className="settings-feedback-success" role="status">If that email is registered, a reset link has been sent.</div>
+          <div className="settings-feedback-success" role="status">{t('resetLinkSent')}</div>
         ) : (
           <form className="login-form" onSubmit={handleSubmit}>
-            <label className="login-field"><span>Email address</span><div className="login-input-wrap"><Mail size={17} /><input type="email" value={email} onChange={event => setEmail(event.target.value)} required autoComplete="email" placeholder="you@example.com" /></div></label>
-            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending…' : 'Send reset link'}</button>
+            <label className="login-field"><span>{t('emailAddress')}</span><div className="login-input-wrap"><Mail size={17} /><input type="email" value={email} onChange={event => setEmail(event.target.value)} required autoComplete="email" placeholder="you@example.com" /></div></label>
+            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? t('sending') : t('sendResetLink')}</button>
           </form>
         )}
-        <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 18, color: '#c48bff', fontSize: 12, textDecoration: 'none' }}><ArrowLeft size={14} /> Back to sign in</Link>
+        <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 18, color: '#c48bff', fontSize: 12, textDecoration: 'none' }}><ArrowLeft size={14} /> {t('backToSignIn')}</Link>
       </section>
     </main>
   )

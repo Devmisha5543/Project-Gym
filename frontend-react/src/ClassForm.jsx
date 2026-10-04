@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { classSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { CalendarDays, Clock3, Dumbbell, MapPin, Plus, Save, Users } from 'lucid
 import FeedbackMessage from './FeedbackMessage'
 
 function ClassForm({ onClassCreated }) {
+  const { t } = useTranslation(['classes', 'common'])
   const [branches, setBranches] = useState([])
   const [trainers, setTrainers] = useState([])
   const [branchId, setBranchId] = useState('')
@@ -27,17 +29,17 @@ function ClassForm({ onClassCreated }) {
           if (!response.ok) throw new Error('Failed to load branches')
           return response.json()
         })
-        .then(setBranches)
-        .catch(() => setLookupError('Unable to load branches or trainers. Please try again.')),
+        .then(data => setBranches(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed'))),
       authFetch(`${API_URL}/trainers`)
         .then(response => {
           if (!response.ok) throw new Error('Failed to load trainers')
           return response.json()
         })
-        .then(setTrainers)
-        .catch(() => setLookupError('Unable to load branches or trainers. Please try again.'))
+        .then(data => setTrainers(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed')))
     ]).finally(() => setLoadingOptions(false))
-  }, [])
+  }, [t])
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -71,7 +73,7 @@ function ClassForm({ onClassCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create class.')
+        if (!response.ok) throw new Error(data.error || t('classCreateFailed'))
         return data
       })
       .then(() => {
@@ -82,9 +84,9 @@ function ClassForm({ onClassCreated }) {
         setDurationMinutes('')
         setCapacity('')
         onClassCreated()
-        setFeedback({ type: 'success', message: 'Class scheduled successfully.' })
+        setFeedback({ type: 'success', message: t('classCreated') })
       })
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create class.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('classCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
@@ -95,8 +97,8 @@ function ClassForm({ onClassCreated }) {
           <Plus size={19} />
         </div>
         <div>
-          <h2>Schedule New Class</h2>
-          <p>Set up a class, instructor, time, and capacity.</p>
+          <h2>{t('scheduleNewClass')}</h2>
+          <p>{t('scheduleClassDescription')}</p>
         </div>
       </div>
 
@@ -105,20 +107,20 @@ function ClassForm({ onClassCreated }) {
       <form className="class-form" onSubmit={handleSubmit}>
         <div className="class-form-grid">
           <label className="class-field">
-            <span>Class name</span>
+            <span>{t('className')}</span>
             <div className="class-input-wrap">
               <Dumbbell size={16} />
-              <input type="text" value={className} onChange={e => setClassName(e.target.value)} required placeholder="e.g. Strength & Conditioning" />
+              <input type="text" value={className} onChange={e => setClassName(e.target.value)} required placeholder={t('classNamePlaceholder')} />
             </div>
             {errors.className && <small className="class-field-error">{errors.className}</small>}
           </label>
 
           <label className="class-field">
-            <span>Branch</span>
+            <span>{t('branch', { ns: 'common' })}</span>
             <div className="class-input-wrap">
               <MapPin size={16} />
               <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
-                <option value="">Select a branch</option>
+                <option value="">{t('selectBranch', { ns: 'common' })}</option>
                 {branches.map(branch => (
                   <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
                 ))}
@@ -128,11 +130,11 @@ function ClassForm({ onClassCreated }) {
           </label>
 
           <label className="class-field">
-            <span>Trainer</span>
+            <span>{t('trainer', { ns: 'common' })}</span>
             <div className="class-input-wrap">
               <Users size={16} />
               <select value={trainerId} onChange={e => setTrainerId(e.target.value)} required>
-                <option value="">Select a trainer</option>
+                <option value="">{t('selectTrainer', { ns: 'common' })}</option>
                 {trainers.map(trainer => (
                   <option key={trainer.trainer_id} value={trainer.trainer_id}>{trainer.name}</option>
                 ))}
@@ -142,7 +144,7 @@ function ClassForm({ onClassCreated }) {
           </label>
 
           <label className="class-field">
-            <span>Schedule time</span>
+            <span>{t('scheduleTime')}</span>
             <div className="class-input-wrap">
               <CalendarDays size={16} />
               <input type="datetime-local" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} required />
@@ -151,19 +153,19 @@ function ClassForm({ onClassCreated }) {
           </label>
 
           <label className="class-field">
-            <span>Duration in minutes</span>
+            <span>{t('durationMinutes')}</span>
             <div className="class-input-wrap">
               <Clock3 size={16} />
-              <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required placeholder="60" />
+              <input type="number" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required placeholder={t('durationMinutesPlaceholder')} />
             </div>
             {errors.durationMinutes && <small className="class-field-error">{errors.durationMinutes}</small>}
           </label>
 
           <label className="class-field">
-            <span>Capacity</span>
+            <span>{t('capacity')}</span>
             <div className="class-input-wrap">
               <Users size={16} />
-              <input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} required placeholder="20" />
+              <input type="number" value={capacity} onChange={e => setCapacity(e.target.value)} required placeholder={t('capacityPlaceholder')} />
             </div>
             {errors.capacity && <small className="class-field-error">{errors.capacity}</small>}
           </label>
@@ -172,7 +174,7 @@ function ClassForm({ onClassCreated }) {
         <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="class-form-actions">
           <button type="submit" className="class-primary-button" disabled={submitting || loadingOptions}>
-            <Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Class'}
+            <Save size={16} /> {submitting ? t('creating') : loadingOptions ? t('loadingOptions') : t('addClass')}
           </button>
         </div>
       </form>

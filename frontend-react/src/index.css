@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap');
 
 :root {
   --page-bg: #070707;
@@ -29,6 +29,12 @@
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+ 
+:root:lang(am),
+html[lang="am"] {
+  font-family: 'Noto Sans Ethiopic', 'Nyala', 'Abyssinica SIL', 'Kefa', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: normal;
 }
 
 :root[data-theme="light"] {

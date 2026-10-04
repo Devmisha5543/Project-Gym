@@ -1,16 +1,18 @@
 import { authFetch } from './authFetch'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import MembershipPlanList from './MembershipPlanList'
 import MembershipPlanForm from './MembershipPlanForm'
 import { CreditCard, Receipt } from 'lucide-react'
 
 function MembershipPlanPage() {
+  const { t } = useTranslation(['payments', 'common'])
   const [membershipPlans, setMembershipPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  function loadMembershipPlans() {
+  const loadMembershipPlans = useCallback(() => {
     setLoading(true)
     setPageError('')
 
@@ -22,35 +24,35 @@ function MembershipPlanPage() {
 
         return response.json()
       })
-      .then(data => setMembershipPlans(data))
+      .then(data => setMembershipPlans(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load membership plans:', error)
         setMembershipPlans([])
-        setPageError('Unable to load membership plans. Please try again.')
+        setPageError(t('planLoadFailed'))
       })
       .finally(() => setLoading(false))
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadMembershipPlans, 0)
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadMembershipPlans])
 
   return (
     <div className="page-container membership-plans-page">
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">GYM MANAGEMENT</p>
-          <h1>Membership Plans</h1>
+          <p className="page-eyebrow">{t('eyebrow')}</p>
+          <h1>{t('plansTitle')}</h1>
           <p className="page-description">
-            Define the plans and benefits available to your members.
+            {t('plansDescription')}
           </p>
         </div>
 
         <div className="plan-total">
           <CreditCard size={19} />
           <span>{membershipPlans.length}</span>
-          <small>Total Plans</small>
+          <small>{t('totalPlans')}</small>
         </div>
       </div>
 
@@ -66,8 +68,8 @@ function MembershipPlanPage() {
       {loading ? (
         <div className="plan-state">
           <div className="loading-spinner"></div>
-          <h3>Loading membership plans</h3>
-          <p>Getting your plan catalogue ready.</p>
+          <h3>{t('loadingPlans')}</h3>
+          <p>{t('gettingPlansReady')}</p>
         </div>
       ) : (
         <MembershipPlanList 

@@ -19,21 +19,13 @@ import {
   Users
 } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
+import { useTranslation } from 'react-i18next'
 import { authFetch } from './authFetch'
 import { API_URL } from './config'
 import { useGym } from './GymContext'
 import './AnalyticsPage.css'
 
 const endpoints = ['overview', 'retention', 'financial', 'memberships', 'growth', 'branches']
-
-const rangeOptions = [
-  { value: 'this_month', label: 'This Month' },
-  { value: 'last_month', label: 'Last Month' },
-  { value: '3m', label: '3 Months' },
-  { value: '6m', label: '6 Months' },
-  { value: 'this_year', label: 'This Year' },
-  { value: 'custom', label: 'Custom' }
-]
 
 // Motion presets conforming to skill guidelines
 const snappy = { type: 'spring', stiffness: 400, damping: 25 }
@@ -43,6 +35,7 @@ const kpiSpring = { type: 'spring', stiffness: 400, damping: 17 }
 export default function AnalyticsPage() {
   const { gym } = useGym()
   const reduceMotion = useReducedMotion()
+  const { t, i18n } = useTranslation(['analytics', 'common'])
 
   const [range, setRange] = useState('6m')
   const [startDate, setStartDate] = useState('')
@@ -55,33 +48,44 @@ export default function AnalyticsPage() {
 
   const currency = gym?.currency || 'USD'
 
+  const rangeOptions = [
+    { value: 'this_month', label: t('thisMonth') },
+    { value: 'last_month', label: t('lastMonth') },
+    { value: '3m', label: t('threeMonths') },
+    { value: '6m', label: t('sixMonths') },
+    { value: 'this_year', label: t('thisYear') },
+    { value: 'custom', label: t('custom') }
+  ]
+
   const formatMoney = useCallback((value) => {
+    const locale = i18n.language === 'am' ? 'am-ET' : 'en-US'
     try {
-      return new Intl.NumberFormat('en-US', {
+      return new Intl.NumberFormat(locale, {
         style: 'currency',
         currency,
         maximumFractionDigits: 0
       }).format(value || 0)
     } catch {
-      return `${currency} ${(value || 0).toLocaleString()}`
+      return `${currency} ${(value || 0).toLocaleString(locale)}`
     }
-  }, [currency])
+  }, [currency, i18n.language])
 
   const formatChartLabel = useCallback((label) => {
     if (!label) return ''
+    const locale = i18n.language === 'am' ? 'am-ET' : 'en-US'
     if (/^\d{4}-\d{2}$/.test(label)) {
       const [year, month] = label.split('-')
       const d = new Date(Number(year), Number(month) - 1, 1)
-      const monthName = d.toLocaleDateString('en-US', { month: 'short' })
+      const monthName = d.toLocaleDateString(locale, { month: 'short' })
       return `${monthName} '${year.slice(2)}`
     }
     if (/^\d{4}-\d{2}-\d{2}$/.test(label)) {
       const [year, month, day] = label.split('-')
       const d = new Date(Number(year), Number(month) - 1, Number(day))
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
     }
     return label
-  }, [])
+  }, [i18n.language])
 
   const formatDateRangeLabel = (rangeObj) => {
     if (!rangeObj?.start_date || !rangeObj?.end_date) return null
@@ -89,9 +93,10 @@ export default function AnalyticsPage() {
       const s = new Date(rangeObj.start_date + 'T00:00:00')
       const e = new Date(rangeObj.end_date + 'T00:00:00')
       const opt = { month: 'short', day: 'numeric', year: 'numeric' }
-      return `${s.toLocaleDateString(undefined, opt)} – ${e.toLocaleDateString(undefined, opt)}`
+      const locale = i18n.language === 'am' ? 'am-ET' : 'en-US'
+      return `${s.toLocaleDateString(locale, opt)} – ${e.toLocaleDateString(locale, opt)}`
     } catch {
-      return `${rangeObj.start_date} to ${rangeObj.end_date}`
+      return `${rangeObj.start_date} – ${rangeObj.end_date}`
     }
   }
 
@@ -101,7 +106,7 @@ export default function AnalyticsPage() {
       const activeEnd = appliedCustomDates.end || endDate
       if (!activeStart || !activeEnd) {
         setLoading(false)
-        setError('Please select both start and end dates for a custom range.')
+        setError(t('customRangeError'))
         return
       }
     }
@@ -119,7 +124,7 @@ export default function AnalyticsPage() {
       const response = await authFetch(`${API_URL}/analytics/${endpoint}?${params}`)
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(body.error || `Failed to load ${endpoint} analytics.`)
+        throw new Error(body.error || t('common:error'))
       }
       return [endpoint, body]
     }))
@@ -127,12 +132,12 @@ export default function AnalyticsPage() {
         setData(Object.fromEntries(results))
       })
       .catch((err) => {
-        setError(err.message || 'Unable to retrieve gym analytics data.')
+        setError(err.message || t('common:unexpectedError'))
       })
       .finally(() => {
         setLoading(false)
       })
-  }, [range, appliedCustomDates, startDate, endDate])
+  }, [range, appliedCustomDates, startDate, endDate, t])
 
   useEffect(() => {
     const timer = setTimeout(loadAnalytics, 0)
@@ -142,11 +147,11 @@ export default function AnalyticsPage() {
   const handleApplyCustomRange = (e) => {
     e.preventDefault()
     if (!startDate || !endDate) {
-      setError('Please choose both start and end dates.')
+      setError(t('chooseStartEndDate'))
       return
     }
     if (new Date(startDate) > new Date(endDate)) {
-      setError('End date must be on or after start date.')
+      setError(t('endDateAfterStartDate'))
       return
     }
     setError('')
@@ -204,11 +209,11 @@ export default function AnalyticsPage() {
           <div className="analytics-header-title-group">
             <div className="analytics-eyebrow-badge">
               <span className="analytics-pulse-dot" />
-              <span>Operational Intelligence</span>
+              <span>{t('operationalIntelligence')}</span>
             </div>
-            <h1>Gym Analytics & Performance</h1>
+            <h1>{t('analyticsTitle')}</h1>
             <p className="analytics-subtitle">
-              Real-time executive oversight across revenue velocity, membership retention, plan performance, and multi-branch yield.
+              {t('analyticsSubtitle')}
             </p>
           </div>
 
@@ -245,13 +250,13 @@ export default function AnalyticsPage() {
                 className="analytics-refresh-btn"
                 onClick={loadAnalytics}
                 disabled={loading}
-                title="Refresh analytics data"
+                title={t('refreshTitle')}
                 whileHover={reduceMotion ? undefined : { scale: 1.03 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                 transition={snappy}
               >
                 <RefreshCw size={14} className={loading ? 'analytics-spinning-icon' : ''} />
-                <span>{loading ? 'Refreshing' : 'Refresh'}</span>
+                <span>{loading ? t('refreshing') : t('refresh')}</span>
               </motion.button>
             </div>
 
@@ -277,7 +282,7 @@ export default function AnalyticsPage() {
             >
               <div className="analytics-custom-date-inputs">
                 <label className="analytics-date-field">
-                  <span>Start Date:</span>
+                  <span>{t('startDate')}</span>
                   <input
                     type="date"
                     value={startDate}
@@ -286,7 +291,7 @@ export default function AnalyticsPage() {
                   />
                 </label>
                 <label className="analytics-date-field">
-                  <span>End Date:</span>
+                  <span>{t('endDate')}</span>
                   <input
                     type="date"
                     value={endDate}
@@ -301,7 +306,7 @@ export default function AnalyticsPage() {
                   whileTap={reduceMotion ? undefined : { scale: 0.97 }}
                   transition={snappy}
                 >
-                  Apply Custom Range
+                  {t('applyCustomRange')}
                 </motion.button>
               </div>
             </motion.form>
@@ -332,7 +337,7 @@ export default function AnalyticsPage() {
               onClick={loadAnalytics}
             >
               <RefreshCw size={12} />
-              <span>Try Again</span>
+              <span>{t('tryAgain')}</span>
             </button>
           </motion.div>
         )}
@@ -342,7 +347,7 @@ export default function AnalyticsPage() {
           LOADING SKELETON OR CONTENT
           ============================================================ */}
       {loading && !data.overview ? (
-        <AnalyticsLoadingSkeleton />
+        <AnalyticsLoadingSkeleton t={t} />
       ) : (
         <>
           {/* ============================================================
@@ -369,7 +374,7 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <CreditCard size={18} />
                     </div>
-                    <span className="analytics-kpi-label">Recorded Revenue</span>
+                    <span className="analytics-kpi-label">{t('recordedRevenue')}</span>
                   </div>
                   {revGrowthPct != null ? (
                     <span className={`analytics-kpi-badge ${revGrowthPct >= 0 ? 'positive' : 'negative'}`}>
@@ -378,7 +383,7 @@ export default function AnalyticsPage() {
                     </span>
                   ) : (
                     <span className="analytics-kpi-badge neutral">
-                      <span>Baseline</span>
+                      <span>{t('baseline')}</span>
                     </span>
                   )}
                 </div>
@@ -389,8 +394,8 @@ export default function AnalyticsPage() {
                   </div>
                   <p className="analytics-kpi-note">
                     {overview.revenue_previous_period != null && overview.revenue_previous_period > 0
-                      ? `vs. ${formatMoney(overview.revenue_previous_period)} in previous period`
-                      : 'Total payment records in this range'}
+                      ? t('vsPreviousPeriod', { amount: formatMoney(overview.revenue_previous_period) })
+                      : t('totalPaymentRecords')}
                   </p>
                 </div>
               </motion.article>
@@ -408,14 +413,14 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <Activity size={18} />
                     </div>
-                    <span className="analytics-kpi-label">Active Members</span>
+                    <span className="analytics-kpi-label">{t('activeMembers')}</span>
                   </div>
                   <span className="analytics-kpi-badge positive">
                     <CheckCircle2 size={12} />
                     <span>
                       {overview.total_members > 0
-                        ? `${Math.round(((overview.active_members || 0) / overview.total_members) * 100)}% valid`
-                        : 'Current'}
+                        ? t('validPct', { pct: Math.round(((overview.active_members || 0) / overview.total_members) * 100) })
+                        : t('current')}
                     </span>
                   </span>
                 </div>
@@ -425,7 +430,7 @@ export default function AnalyticsPage() {
                     {(overview.active_members || 0).toLocaleString()}
                   </div>
                   <p className="analytics-kpi-note">
-                    Out of {(overview.total_members || 0).toLocaleString()} total registered members
+                    {t('outOfTotal', { total: (overview.total_members || 0).toLocaleString() })}
                   </p>
                   <div className="analytics-kpi-progress">
                     <div
@@ -453,7 +458,7 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <Users size={16} />
                     </div>
-                    <span className="analytics-kpi-label">New Registrations</span>
+                    <span className="analytics-kpi-label">{t('newRegistrations')}</span>
                   </div>
                   {memberGrowthPct != null ? (
                     <span className={`analytics-kpi-badge ${memberGrowthPct >= 0 ? 'positive' : 'negative'}`}>
@@ -462,7 +467,7 @@ export default function AnalyticsPage() {
                     </span>
                   ) : (
                     <span className="analytics-kpi-badge neutral">
-                      <span>{overview.member_growth ?? 0} joins</span>
+                      <span>{t('joinsCountUnit', { count: overview.member_growth ?? 0 })}</span>
                     </span>
                   )}
                 </div>
@@ -473,8 +478,8 @@ export default function AnalyticsPage() {
                   </div>
                   <p className="analytics-kpi-note">
                     {overview.new_members_previous_period != null
-                      ? `${overview.new_members_previous_period} new members in prior cycle`
-                      : 'New joins recorded in period'}
+                      ? t('priorCycleJoins', { count: overview.new_members_previous_period })
+                      : t('newJoinsRecorded')}
                   </p>
                 </div>
               </motion.article>
@@ -492,10 +497,10 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <DollarSign size={16} />
                     </div>
-                    <span className="analytics-kpi-label">Paying Members</span>
+                    <span className="analytics-kpi-label">{t('payingMembers')}</span>
                   </div>
                   <span className="analytics-kpi-badge neutral">
-                    <span>Transacted</span>
+                    <span>{t('transacted')}</span>
                   </span>
                 </div>
 
@@ -504,7 +509,7 @@ export default function AnalyticsPage() {
                     {(financial.paying_members || 0).toLocaleString()}
                   </div>
                   <p className="analytics-kpi-note">
-                    Avg. <strong>{formatMoney(financial.average_revenue_per_paying_member)}</strong> per paying member
+                    {t('avgPerPayingMember', { amount: formatMoney(financial.average_revenue_per_paying_member) })}
                   </p>
                 </div>
               </motion.article>
@@ -522,15 +527,15 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <CalendarDays size={16} />
                     </div>
-                    <span className="analytics-kpi-label">Expired Terms</span>
+                    <span className="analytics-kpi-label">{t('expiredTerms')}</span>
                   </div>
                   {(overview.expired_memberships || 0) > 0 ? (
                     <span className="analytics-kpi-badge negative">
-                      <span>Action needed</span>
+                      <span>{t('actionNeeded')}</span>
                     </span>
                   ) : (
                     <span className="analytics-kpi-badge positive">
-                      <span>Up to date</span>
+                      <span>{t('upToDate')}</span>
                     </span>
                   )}
                 </div>
@@ -540,7 +545,7 @@ export default function AnalyticsPage() {
                     {(overview.expired_memberships || 0).toLocaleString()}
                   </div>
                   <p className="analytics-kpi-note">
-                    Memberships expired requiring renewal
+                    {t('expiredRequiringRenewal')}
                   </p>
                 </div>
               </motion.article>
@@ -558,10 +563,10 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <Sparkles size={16} />
                     </div>
-                    <span className="analytics-kpi-label">Lifetime Gym Revenue</span>
+                    <span className="analytics-kpi-label">{t('lifetimeRevenue')}</span>
                   </div>
                   <span className="analytics-kpi-badge neutral">
-                    <span>Cumulative</span>
+                    <span>{t('cumulative')}</span>
                   </span>
                 </div>
 
@@ -570,7 +575,7 @@ export default function AnalyticsPage() {
                     {formatMoney(overview.total_recorded_revenue)}
                   </div>
                   <p className="analytics-kpi-note">
-                    All-time recorded payment volume since launch
+                    {t('allTimeVolume')}
                   </p>
                 </div>
               </motion.article>
@@ -588,10 +593,10 @@ export default function AnalyticsPage() {
                     <div className="analytics-kpi-icon-wrap">
                       <Users size={16} />
                     </div>
-                    <span className="analytics-kpi-label">Total Member Roster</span>
+                    <span className="analytics-kpi-label">{t('totalRoster')}</span>
                   </div>
                   <span className="analytics-kpi-badge neutral">
-                    <span>All-Time</span>
+                    <span>{t('allTime')}</span>
                   </span>
                 </div>
 
@@ -600,7 +605,7 @@ export default function AnalyticsPage() {
                     {(overview.total_members || 0).toLocaleString()}
                   </div>
                   <p className="analytics-kpi-note">
-                    Cumulative registered members across all facilities
+                    {t('cumulativeFacilities')}
                   </p>
                 </div>
               </motion.article>
@@ -622,8 +627,8 @@ export default function AnalyticsPage() {
                   <TrendingUp size={16} />
                 </div>
                 <div className="analytics-section-heading">
-                  <h2>Financial & Acquisition Dynamics</h2>
-                  <p>Revenue collections trend alongside new member velocity over the selected timeframe.</p>
+                  <h2>{t('financialAcquisition')}</h2>
+                  <p>{t('financialAcquisitionDesc')}</p>
                 </div>
               </div>
             </div>
@@ -633,8 +638,8 @@ export default function AnalyticsPage() {
               <article className="analytics-panel-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>Revenue Trend</h3>
-                    <p>Collections timeline by period</p>
+                    <h3>{t('revenueTrend')}</h3>
+                    <p>{t('collectionsTimeline')}</p>
                   </div>
                   <div className="analytics-panel-stat-pill">
                     {formatMoney(financial.revenue)}
@@ -645,6 +650,7 @@ export default function AnalyticsPage() {
                   rows={financial.trend}
                   formatMoney={formatMoney}
                   formatChartLabel={formatChartLabel}
+                  t={t}
                 />
               </article>
 
@@ -652,17 +658,18 @@ export default function AnalyticsPage() {
               <article className="analytics-panel-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>New Member Acquisition</h3>
-                    <p>Registrations grouped by join date</p>
+                    <h3>{t('newMemberAcquisition')}</h3>
+                    <p>{t('registrationsByJoinDate')}</p>
                   </div>
                   <div className="analytics-panel-stat-pill">
-                    {(overview.new_members || 0)} Joins
+                    {t('joinsCount', { count: overview.new_members || 0 })}
                   </div>
                 </div>
 
                 <MemberGrowthBarChart
                   rows={growth.new_members}
                   formatChartLabel={formatChartLabel}
+                  t={t}
                 />
               </article>
             </div>
@@ -683,8 +690,8 @@ export default function AnalyticsPage() {
                   <Activity size={16} />
                 </div>
                 <div className="analytics-section-heading">
-                  <h2>Retention & Membership Health</h2>
-                  <p>Current membership status distribution alongside plan popularity.</p>
+                  <h2>{t('retentionHealthTitle')}</h2>
+                  <p>{t('retentionHealthDesc')}</p>
                 </div>
               </div>
             </div>
@@ -694,12 +701,12 @@ export default function AnalyticsPage() {
               <article className="analytics-panel-card analytics-health-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>Membership Lifecycle Status</h3>
-                    <p>Current status breakdown of member base</p>
+                    <h3>{t('membershipLifecycle')}</h3>
+                    <p>{t('statusBreakdown')}</p>
                   </div>
                 </div>
 
-                <RetentionDistributionWidget retention={retention} />
+                <RetentionDistributionWidget retention={retention} t={t} />
 
                 {retention.unavailable_reason && (
                   <div className="analytics-schema-callout">
@@ -713,13 +720,13 @@ export default function AnalyticsPage() {
               <article className="analytics-panel-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>Plan Performance</h3>
-                    <p>Active members and recorded volume by plan</p>
+                    <h3>{t('planPerformance')}</h3>
+                    <p>{t('planActiveVolume')}</p>
                   </div>
                   {memberships.most_popular_plan && (
                     <span className="analytics-status-pill success">
                       <Sparkles size={11} />
-                      <span>Top: {memberships.most_popular_plan}</span>
+                      <span>{t('topPlan', { name: memberships.most_popular_plan })}</span>
                     </span>
                   )}
                 </div>
@@ -727,6 +734,7 @@ export default function AnalyticsPage() {
                 <PlanPerformanceWidget
                   plans={memberships.plans}
                   formatMoney={formatMoney}
+                  t={t}
                 />
 
                 {memberships.unavailable_reason && (
@@ -754,8 +762,8 @@ export default function AnalyticsPage() {
                   <Building2 size={16} />
                 </div>
                 <div className="analytics-section-heading">
-                  <h2>Branch Performance & Facilities</h2>
-                  <p>Member distribution and recorded revenue across gym locations.</p>
+                  <h2>{t('branchPerformance')}</h2>
+                  <p>{t('branchPerformanceDesc')}</p>
                 </div>
               </div>
             </div>
@@ -764,30 +772,32 @@ export default function AnalyticsPage() {
               <article className="analytics-panel-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>Members by Branch</h3>
-                    <p>Total and active membership distribution</p>
+                    <h3>{t('membersByBranch')}</h3>
+                    <p>{t('memberDistribution')}</p>
                   </div>
                   <div className="analytics-panel-stat-pill">
-                    {branches.branches?.length || 0} Facilities
+                    {t('facilitiesCount', { count: branches.branches?.length || 0 })}
                   </div>
                 </div>
 
                 <BranchComparisonWidget
                   branches={branches.branches}
+                  t={t}
                 />
               </article>
 
               <article className="analytics-panel-card">
                 <div className="analytics-panel-head">
                   <div className="analytics-panel-title-area">
-                    <h3>Branch Revenue Breakdown</h3>
-                    <p>Recorded revenue attributed to each facility</p>
+                    <h3>{t('branchRevenue')}</h3>
+                    <p>{t('branchRevenueDesc')}</p>
                   </div>
                 </div>
 
                 <BranchRevenueWidget
                   branches={branches.branches}
                   formatMoney={formatMoney}
+                  t={t}
                 />
 
                 {branches.unavailable_reason && (
@@ -816,9 +826,9 @@ export default function AnalyticsPage() {
                     <Layers size={16} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Operational Breakdown</h3>
+                    <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{t('operationalBreakdown')}</h3>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
-                      Granular operational metrics by membership plan and facility branch.
+                      {t('granularMetrics')}
                     </p>
                   </div>
                 </div>
@@ -837,7 +847,7 @@ export default function AnalyticsPage() {
                         transition={snappy}
                       />
                     )}
-                    <span>Membership Plans</span>
+                    <span>{t('membershipPlans')}</span>
                   </button>
                   <button
                     type="button"
@@ -851,7 +861,7 @@ export default function AnalyticsPage() {
                         transition={snappy}
                       />
                     )}
-                    <span>Branches</span>
+                    <span>{t('branches')}</span>
                   </button>
                 </div>
               </div>
@@ -861,12 +871,12 @@ export default function AnalyticsPage() {
                   <table className="analytics-modern-table" aria-label="Membership plans detailed table">
                     <thead>
                       <tr>
-                        <th>Plan Name</th>
-                        <th>Active Members</th>
-                        <th>Expired</th>
-                        <th>Expiring Soon (&lt; 8 days)</th>
-                        <th>Avg Term Duration</th>
-                        <th>Recorded Revenue</th>
+                        <th>{t('planName')}</th>
+                        <th>{t('activeMembers')}</th>
+                        <th>{t('expired')}</th>
+                        <th>{t('expiringSoonDays')}</th>
+                        <th>{t('avgTermDuration')}</th>
+                        <th>{t('recordedRevenue')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -879,7 +889,7 @@ export default function AnalyticsPage() {
                             <td className="numeric-cell">
                               {plan.expiring_soon > 0 ? (
                                 <span className="analytics-status-pill warning">
-                                  {plan.expiring_soon} soon
+                                  {t('soonCount', { count: plan.expiring_soon })}
                                 </span>
                               ) : (
                                 '0'
@@ -887,7 +897,7 @@ export default function AnalyticsPage() {
                             </td>
                             <td>
                               {plan.average_recorded_term_days != null
-                                ? `${plan.average_recorded_term_days} days`
+                                ? t('daysCount', { count: plan.average_recorded_term_days })
                                 : '—'}
                             </td>
                             <td className="numeric-cell">{formatMoney(plan.recorded_revenue)}</td>
@@ -900,8 +910,8 @@ export default function AnalyticsPage() {
                               <div className="analytics-empty-icon-wrap">
                                 <CreditCard size={24} />
                               </div>
-                              <h4>No Membership Plans Found</h4>
-                              <p>Add membership plans to view comprehensive plan analytics.</p>
+                              <h4>{t('noPlansFound')}</h4>
+                              <p>{t('noPlansFoundDesc')}</p>
                             </div>
                           </td>
                         </tr>
@@ -914,12 +924,12 @@ export default function AnalyticsPage() {
                   <table className="analytics-modern-table" aria-label="Branch operations detailed table">
                     <thead>
                       <tr>
-                        <th>Facility Branch</th>
-                        <th>Total Members</th>
-                        <th>Active Members</th>
-                        <th>New Members (Range)</th>
-                        <th>Recorded Revenue</th>
-                        <th>Status</th>
+                        <th>{t('facilityBranch')}</th>
+                        <th>{t('totalMembers')}</th>
+                        <th>{t('activeMembers')}</th>
+                        <th>{t('newMembersRange')}</th>
+                        <th>{t('recordedRevenue')}</th>
+                        <th>{t('status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -933,7 +943,7 @@ export default function AnalyticsPage() {
                             <td className="numeric-cell">{formatMoney(b.recorded_revenue)}</td>
                             <td>
                               <span className="analytics-status-pill muted">
-                                Operational
+                                {t('operational')}
                               </span>
                             </td>
                           </tr>
@@ -945,8 +955,8 @@ export default function AnalyticsPage() {
                               <div className="analytics-empty-icon-wrap">
                                 <Building2 size={24} />
                               </div>
-                              <h4>No Branches Found</h4>
-                              <p>Register gym branches to monitor location-specific operations.</p>
+                              <h4>{t('noBranchesFound')}</h4>
+                              <p>{t('noBranchesFoundDesc')}</p>
                             </div>
                           </td>
                         </tr>
@@ -970,7 +980,7 @@ export default function AnalyticsPage() {
 /**
  * Modern SVG Area & Line Chart for Revenue Trend with interactive tooltips
  */
-function RevenueTrendChart({ rows = [], formatMoney, formatChartLabel }) {
+function RevenueTrendChart({ rows = [], formatMoney, formatChartLabel, t }) {
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const chartGradientId = useId()
 
@@ -982,8 +992,8 @@ function RevenueTrendChart({ rows = [], formatMoney, formatChartLabel }) {
         <div className="analytics-empty-icon-wrap">
           <CreditCard size={24} />
         </div>
-        <h4>No financial data yet</h4>
-        <p>Once payments are recorded, your revenue analytics will appear here.</p>
+        <h4>{t('noFinancialData')}</h4>
+        <p>{t('noFinancialDataDesc')}</p>
       </div>
     )
   }
@@ -1087,7 +1097,7 @@ function RevenueTrendChart({ rows = [], formatMoney, formatChartLabel }) {
 /**
  * Member Acquisition Bar Chart
  */
-function MemberGrowthBarChart({ rows = [], formatChartLabel }) {
+function MemberGrowthBarChart({ rows = [], formatChartLabel, t }) {
   const hasData = rows.length > 0 && rows.some((r) => Number(r.count) > 0)
 
   if (!hasData) {
@@ -1096,8 +1106,8 @@ function MemberGrowthBarChart({ rows = [], formatChartLabel }) {
         <div className="analytics-empty-icon-wrap">
           <Users size={24} />
         </div>
-        <h4>No new member joins recorded</h4>
-        <p>As members join during this date range, their registration volume will plot here.</p>
+        <h4>{t('noMemberJoins')}</h4>
+        <p>{t('noMemberJoinsDesc')}</p>
       </div>
     )
   }
@@ -1112,7 +1122,7 @@ function MemberGrowthBarChart({ rows = [], formatChartLabel }) {
         const heightPct = count > 0 ? Math.max(8, Math.round((count / max) * 100)) : 3
         const formattedLabel = formatChartLabel ? formatChartLabel(row.label) : row.label
         return (
-          <div key={idx} className="analytics-bar-col" title={`${formattedLabel}: ${count} joins`}>
+          <div key={idx} className="analytics-bar-col" title={`${formattedLabel}: ${t('joinsCountUnit', { count })}`}>
             {count > 0 && <span className="analytics-bar-val-badge">{count}</span>}
             <div className="analytics-bar-track">
               <div
@@ -1131,7 +1141,7 @@ function MemberGrowthBarChart({ rows = [], formatChartLabel }) {
 /**
  * Retention Distribution Widget
  */
-function RetentionDistributionWidget({ retention = {} }) {
+function RetentionDistributionWidget({ retention = {}, t }) {
   const active = retention.current_active_memberships || 0
   const expired = retention.current_expired_memberships || 0
   const cancelled = retention.explicitly_cancelled_memberships || 0
@@ -1141,19 +1151,19 @@ function RetentionDistributionWidget({ retention = {} }) {
   return (
     <div className="analytics-distribution-bar-wrap">
       <div className="analytics-distribution-labels">
-        <span>Active ({active})</span>
-        <span>Expired ({expired})</span>
-        <span>Cancelled ({cancelled})</span>
-        <span>None ({none})</span>
+        <span>{t('active')} ({active})</span>
+        <span>{t('expired')} ({expired})</span>
+        <span>{t('cancelled')} ({cancelled})</span>
+        <span>{t('none')} ({none})</span>
       </div>
 
       <div className="analytics-distribution-bar">
         {total > 0 ? (
           <>
-            <div className="analytics-dist-segment active" style={{ width: `${(active / total) * 100}%` }} title={`Active: ${active}`} />
-            <div className="analytics-dist-segment expired" style={{ width: `${(expired / total) * 100}%` }} title={`Expired: ${expired}`} />
-            <div className="analytics-dist-segment cancelled" style={{ width: `${(cancelled / total) * 100}%` }} title={`Cancelled: ${cancelled}`} />
-            <div className="analytics-dist-segment none" style={{ width: `${(none / total) * 100}%` }} title={`No membership: ${none}`} />
+            <div className="analytics-dist-segment active" style={{ width: `${(active / total) * 100}%` }} title={`${t('active')}: ${active}`} />
+            <div className="analytics-dist-segment expired" style={{ width: `${(expired / total) * 100}%` }} title={`${t('expired')}: ${expired}`} />
+            <div className="analytics-dist-segment cancelled" style={{ width: `${(cancelled / total) * 100}%` }} title={`${t('cancelled')}: ${cancelled}`} />
+            <div className="analytics-dist-segment none" style={{ width: `${(none / total) * 100}%` }} title={`${t('none')}: ${none}`} />
           </>
         ) : (
           <div className="analytics-dist-segment none" style={{ width: '100%' }} />
@@ -1162,19 +1172,19 @@ function RetentionDistributionWidget({ retention = {} }) {
 
       <div className="analytics-health-tiles-grid" style={{ marginTop: 18 }}>
         <div className="analytics-health-tile active">
-          <span className="analytics-health-tile-title">Currently Active</span>
+          <span className="analytics-health-tile-title">{t('currentlyActive')}</span>
           <span className="analytics-health-tile-val">{active}</span>
         </div>
         <div className="analytics-health-tile expired">
-          <span className="analytics-health-tile-title">Currently Expired</span>
+          <span className="analytics-health-tile-title">{t('currentlyExpired')}</span>
           <span className="analytics-health-tile-val">{expired}</span>
         </div>
         <div className="analytics-health-tile cancelled">
-          <span className="analytics-health-tile-title">Explicitly Cancelled</span>
+          <span className="analytics-health-tile-title">{t('explicitlyCancelled')}</span>
           <span className="analytics-health-tile-val">{cancelled}</span>
         </div>
         <div className="analytics-health-tile none">
-          <span className="analytics-health-tile-title">No Membership Record</span>
+          <span className="analytics-health-tile-title">{t('noMembershipRecord')}</span>
           <span className="analytics-health-tile-val">{none}</span>
         </div>
       </div>
@@ -1185,15 +1195,15 @@ function RetentionDistributionWidget({ retention = {} }) {
 /**
  * Plan Performance Widget
  */
-function PlanPerformanceWidget({ plans = [], formatMoney }) {
+function PlanPerformanceWidget({ plans = [], formatMoney, t }) {
   if (!plans.length) {
     return (
       <div className="analytics-empty-state">
         <div className="analytics-empty-icon-wrap">
           <CreditCard size={24} />
         </div>
-        <h4>No membership plans configured</h4>
-        <p>Create membership plans to monitor adoption and active members.</p>
+        <h4>{t('noPlansConfigured')}</h4>
+        <p>{t('noPlansConfiguredDesc')}</p>
       </div>
     )
   }
@@ -1209,15 +1219,15 @@ function PlanPerformanceWidget({ plans = [], formatMoney }) {
             <div className="analytics-ranked-top">
               <span className="analytics-ranked-name">{plan.plan_name}</span>
               <span className="analytics-ranked-metric">
-                {plan.active || 0} active
+                {t('activeCount', { count: plan.active || 0 })}
               </span>
             </div>
             <div className="analytics-ranked-track">
               <div className="analytics-ranked-fill" style={{ width: `${pct}%` }} />
             </div>
             <div className="analytics-ranked-top analytics-ranked-sub">
-              <span>{formatMoney(plan.recorded_revenue)} recorded</span>
-              <span>{plan.expired || 0} expired • {plan.expiring_soon || 0} due soon</span>
+              <span>{t('recordedAmount', { amount: formatMoney(plan.recorded_revenue) })}</span>
+              <span>{t('expiredAndDueSoon', { expired: plan.expired || 0, soon: plan.expiring_soon || 0 })}</span>
             </div>
           </div>
         )
@@ -1229,15 +1239,15 @@ function PlanPerformanceWidget({ plans = [], formatMoney }) {
 /**
  * Branch Comparison Widget
  */
-function BranchComparisonWidget({ branches = [] }) {
+function BranchComparisonWidget({ branches = [], t }) {
   if (!branches.length) {
     return (
       <div className="analytics-empty-state">
         <div className="analytics-empty-icon-wrap">
           <Building2 size={24} />
         </div>
-        <h4>No branches registered</h4>
-        <p>Set up gym facilities to observe location comparisons.</p>
+        <h4>{t('noBranchesRegistered')}</h4>
+        <p>{t('noBranchesRegisteredDesc')}</p>
       </div>
     )
   }
@@ -1256,15 +1266,15 @@ function BranchComparisonWidget({ branches = [] }) {
                 {b.branch_name}
               </span>
               <span className="analytics-ranked-metric">
-                {b.total_members || 0} members
+                {t('membersCount', { count: b.total_members || 0 })}
               </span>
             </div>
             <div className="analytics-ranked-track">
               <div className="analytics-ranked-fill" style={{ width: `${pct}%` }} />
             </div>
             <div className="analytics-ranked-top analytics-ranked-sub">
-              <span>{b.active_members || 0} active members</span>
-              <span>{b.new_members || 0} new in period</span>
+              <span>{t('activeMembersCount', { count: b.active_members || 0 })}</span>
+              <span>{t('newInPeriod', { count: b.new_members || 0 })}</span>
             </div>
           </div>
         )
@@ -1276,7 +1286,7 @@ function BranchComparisonWidget({ branches = [] }) {
 /**
  * Branch Revenue Widget
  */
-function BranchRevenueWidget({ branches = [], formatMoney }) {
+function BranchRevenueWidget({ branches = [], formatMoney, t }) {
   const hasRevenue = branches.some((b) => Number(b.recorded_revenue) > 0)
   const maxRevenue = Math.max(...branches.map((b) => Number(b.recorded_revenue) || 0), 1)
 
@@ -1286,8 +1296,8 @@ function BranchRevenueWidget({ branches = [], formatMoney }) {
         <div className="analytics-empty-icon-wrap">
           <DollarSign size={24} />
         </div>
-        <h4>No branch revenue recorded in this period</h4>
-        <p>Payments recorded for members will attribute revenue to their respective home branch.</p>
+        <h4>{t('noBranchRevenue')}</h4>
+        <p>{t('noBranchRevenueDesc')}</p>
       </div>
     )
   }
@@ -1316,9 +1326,9 @@ function BranchRevenueWidget({ branches = [], formatMoney }) {
 /**
  * Skeleton Loading Placeholder (Zero Layout Jump)
  */
-function AnalyticsLoadingSkeleton() {
+function AnalyticsLoadingSkeleton({ t }) {
   return (
-    <div className="analytics-skeleton-wrapper" aria-busy="true" aria-label="Loading analytics data">
+    <div className="analytics-skeleton-wrapper" aria-busy="true" aria-label={t ? t('loadingAnalytics') : 'Loading analytics data'}>
       <div className="analytics-kpi-grid">
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <div

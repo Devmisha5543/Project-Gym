@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_URL } from './config'
 import { LockKeyhole, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 function ResetPassword() {
+  const { t } = useTranslation('auth')
   const [token] = useState(() => new URLSearchParams(window.location.search).get('token') || '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -25,11 +27,11 @@ function ResetPassword() {
     event.preventDefault()
     setError('')
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
+      setError(t('passwordTooShort'))
       return
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.')
+      setError(t('passwordsDoNotMatch'))
       return
     }
 
@@ -40,9 +42,9 @@ function ResetPassword() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, new_password: password })
       })
-      const data = await response.json()
+      await response.json()
       if (!response.ok) {
-        setError(data.error || 'Unable to reset your password. Request a new link and try again.')
+        setError(t('resetFailed'))
         setIsSubmitting(false)
         return
       }
@@ -51,7 +53,7 @@ function ResetPassword() {
       setSuccess(true)
       window.setTimeout(() => navigate('/login', { replace: true }), 1200)
     } catch {
-      setError('Unable to connect to the server. Please try again.')
+      setError(t('common:networkError'))
       setIsSubmitting(false)
     }
   }
@@ -61,18 +63,18 @@ function ResetPassword() {
       <div className="login-orbit login-orbit-one"></div>
       <div className="login-orbit login-orbit-two"></div>
       <section className="login-card">
-        <div className="login-brand"><div className="login-brand-mark">PG</div><div><strong>Project Gym</strong><span>Management platform</span></div></div>
-        <div className="login-heading"><ShieldCheck size={20} /><span>ACCOUNT RECOVERY</span><h1>Reset password</h1><p>Choose a new password with at least 8 characters.</p></div>
+        <div className="login-brand"><div className="login-brand-mark">PG</div><div><strong>Project Gym</strong><span>{t('managementPlatform')}</span></div></div>
+        <div className="login-heading"><ShieldCheck size={20} /><span>{t('accountRecovery')}</span><h1>{t('resetPassword')}</h1><p>{t('chooseNewPassword')}</p></div>
         {success ? (
-          <div className="settings-feedback-success" role="status">Your password was changed. Redirecting to sign in…</div>
+          <div className="settings-feedback-success" role="status">{t('passwordChanged')}</div>
         ) : !token ? (
-          <div className="settings-feedback-error" role="alert">This reset link is invalid or has expired. Request a new link to continue.</div>
+          <div className="settings-feedback-error" role="alert">{t('invalidResetLink')}</div>
         ) : (
           <form className="login-form" onSubmit={handleSubmit}>
-            <label className="login-field"><span>New password</span><div className="login-input-wrap"><LockKeyhole size={17} /><input type="password" value={password} onChange={event => setPassword(event.target.value)} required minLength={8} autoComplete="new-password" /></div></label>
-            <label className="login-field"><span>Confirm password</span><div className="login-input-wrap"><LockKeyhole size={17} /><input type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required minLength={8} autoComplete="new-password" /></div></label>
+            <label className="login-field"><span>{t('newPassword')}</span><div className="login-input-wrap"><LockKeyhole size={17} /><input type="password" value={password} onChange={event => setPassword(event.target.value)} required minLength={8} autoComplete="new-password" /></div></label>
+            <label className="login-field"><span>{t('confirmPassword')}</span><div className="login-input-wrap"><LockKeyhole size={17} /><input type="password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} required minLength={8} autoComplete="new-password" /></div></label>
             {error && <div className="settings-feedback-error" role="alert">{error}</div>}
-            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Updating…' : 'Update password'}</button>
+            <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? t('updating') : t('updatePassword')}</button>
           </form>
         )}
       </section>

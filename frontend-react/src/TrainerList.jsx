@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Award,
   Mail,
@@ -13,6 +14,7 @@ import { API_URL } from './config'
 import { authFetch } from './authFetch'
 
 function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
+  const { t } = useTranslation(['people', 'common'])
   const [editingId, setEditingId] = useState(null)
 
   const [editForm, setEditForm] = useState({
@@ -61,22 +63,22 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
 
   async function handleUpdate(trainerId) {
     if (!editForm.name.trim()) {
-      setError('Trainer name is required.')
+      setError(t('trainerNameRequired'))
       return
     }
 
     if (!editForm.phone.trim()) {
-      setError('Phone is required.')
+      setError(t('phoneRequired'))
       return
     }
 
     if (!editForm.email.trim()) {
-      setError('Email is required.')
+      setError(t('emailRequired'))
       return
     }
 
     if (!editForm.certification.trim()) {
-      setError('Certification is required.')
+      setError(t('certificationRequired'))
       return
     }
 
@@ -103,7 +105,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update trainer.')
+        throw new Error(data.error || t('trainerUpdateFailed'))
       }
 
       setEditingId(null)
@@ -113,7 +115,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       }
     } catch (err) {
       console.error('Failed to update trainer:', err)
-      setError(err.message || 'Unable to update trainer.')
+      setError(err.message || t('trainerUpdateFailed'))
     } finally {
       setSaving(false)
     }
@@ -121,7 +123,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
 
   async function handleDelete(trainer) {
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${trainer.name}"?`
+      t('deleteTrainerConfirm', { name: trainer.name })
     )
 
     if (!confirmed) {
@@ -142,7 +144,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete trainer.')
+        throw new Error(data.error || t('trainerDeleteFailed'))
       }
 
       if (onTrainerDeleted) {
@@ -150,7 +152,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       }
     } catch (err) {
       console.error('Failed to delete trainer:', err)
-      setError(err.message || 'Unable to delete trainer.')
+      setError(err.message || t('trainerDeleteFailed'))
     } finally {
       setDeletingId(null)
     }
@@ -163,8 +165,8 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
           <UserRound size={25} />
         </div>
 
-        <h3>No trainers yet</h3>
-        <p>Add your first coach above to build your training team.</p>
+        <h3>{t('noTrainers')}</h3>
+        <p>{t('addTrainerHelp')}</p>
       </div>
     )
   }
@@ -195,17 +197,17 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                 <div className="trainer-card-title-row">
                   <div>
                     <span className="trainer-card-label">
-                      Editing Trainer #{trainer.trainer_id}
+                      {t('editingTrainer', { id: trainer.trainer_id })}
                     </span>
 
-                    <h2>Edit Trainer</h2>
+                    <h2>{t('editTrainer')}</h2>
                   </div>
                 </div>
 
                 <div className="trainer-form-grid">
 
                   <label className="trainer-field">
-                    <span>Full name</span>
+                    <span>{t('name', { ns: 'common' })}</span>
 
                     <div className="trainer-input-wrap">
                       <UserRound size={16} />
@@ -222,7 +224,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                   </label>
 
                   <label className="trainer-field">
-                    <span>Phone</span>
+                    <span>{t('phone', { ns: 'common' })}</span>
 
                     <div className="trainer-input-wrap">
                       <Phone size={16} />
@@ -239,7 +241,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                   </label>
 
                   <label className="trainer-field">
-                    <span>Email</span>
+                    <span>{t('email', { ns: 'common' })}</span>
 
                     <div className="trainer-input-wrap">
                       <Mail size={16} />
@@ -256,7 +258,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                   </label>
 
                   <label className="trainer-field">
-                    <span>Certification</span>
+                    <span>{t('certification')}</span>
 
                     <div className="trainer-input-wrap">
                       <Award size={16} />
@@ -289,7 +291,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                   >
                     <Save size={16} />
 
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? t('saving', { ns: 'common' }) : t('saveChanges')}
                   </button>
 
                   <button
@@ -299,7 +301,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                     disabled={saving}
                   >
                     <X size={16} />
-                    Cancel
+                    {t('cancel', { ns: 'common' })}
                   </button>
 
                 </div>
@@ -312,7 +314,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
 
                   <div>
                     <span className="trainer-card-label">
-                      Trainer #{trainer.trainer_id}
+                      {t('trainerCardLabel', { id: trainer.trainer_id })}
                     </span>
 
                     <h2>{trainer.name}</h2>
@@ -347,7 +349,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                     onClick={() => startEditing(trainer)}
                   >
                     <Pencil size={15} />
-                    Edit
+                    {t('edit', { ns: 'common' })}
                   </button>
 
                   <button
@@ -361,8 +363,8 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
                     <Trash2 size={15} />
 
                     {deletingId === trainer.trainer_id
-                      ? 'Deleting...'
-                      : 'Delete'}
+                      ? t('deleting', { ns: 'common' })
+                      : t('delete', { ns: 'common' })}
                   </button>
 
                 </div>

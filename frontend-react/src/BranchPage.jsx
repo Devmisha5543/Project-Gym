@@ -1,16 +1,18 @@
 import { authFetch } from './authFetch'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import BranchList from './BranchList'
 import BranchForm from './BranchForm'
 import { Building2, MapPinned } from 'lucide-react'
 
 function BranchPage() {
+  const { t } = useTranslation(['people', 'common'])
   const [branches, setBranches] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
 
-  function loadBranches() {
+  const loadBranches = useCallback(() => {
     setLoading(true)
     setPageError('')
 
@@ -22,35 +24,35 @@ function BranchPage() {
 
         return response.json()
       })
-      .then(data => setBranches(data))
+      .then(data => setBranches(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load branches:', error)
         setBranches([])
-        setPageError('Unable to load branches. Please try again.')
+        setPageError(t('branchLoadFailed', { defaultValue: 'Unable to load branches. Please try again.' }))
       })
       .finally(() => setLoading(false))
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadBranches, 0)
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadBranches])
 
   return (
     <div className="page-container branches-page">
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">GYM MANAGEMENT</p>
-          <h1>Branches</h1>
+          <p className="page-eyebrow">{t('eyebrow')}</p>
+          <h1>{t('branchesTitle')}</h1>
           <p className="page-description">
-            Manage the locations that make up your gym network.
+            {t('branchesDescription')}
           </p>
         </div>
 
         <div className="branch-total">
           <Building2 size={19} />
           <span>{branches.length}</span>
-          <small>Total Branches</small>
+          <small>{t('totalBranches')}</small>
         </div>
       </div>
 
@@ -62,11 +64,11 @@ function BranchPage() {
           <span>{pageError}</span>
         </div>
       )}
-            {loading ? (
+      {loading ? (
         <div className="branch-state">
           <div className="loading-spinner"></div>
-          <h3>Loading branches</h3>
-          <p>Getting your gym locations ready.</p>
+          <h3>{t('loadingBranchesShort')}</h3>
+          <p>{t('gettingBranchesReady')}</p>
         </div>
       ) : (
         <BranchList
@@ -80,5 +82,3 @@ function BranchPage() {
 }
 
 export default BranchPage
-
-    

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { classBookingSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { CalendarCheck, CalendarDays, Dumbbell, Save, UserRound } from 'lucide-r
 import FeedbackMessage from './FeedbackMessage'
 
 function ClassBookingForm({ onClassBookingCreated }) {
+  const { t } = useTranslation(['classes', 'common'])
   const [members, setMembers] = useState([])
   const [classes, setClasses] = useState([])
   const [memberId, setMemberId] = useState('')
@@ -25,17 +27,17 @@ function ClassBookingForm({ onClassBookingCreated }) {
           if (!response.ok) throw new Error('Failed to load members')
           return response.json()
         })
-        .then(setMembers)
-        .catch(() => setLookupError('Unable to load members or classes. Please try again.')),
+        .then(data => setMembers(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed'))),
       authFetch(`${API_URL}/classes`)
         .then(response => {
           if (!response.ok) throw new Error('Failed to load classes')
           return response.json()
         })
-        .then(setClasses)
-        .catch(() => setLookupError('Unable to load members or classes. Please try again.'))
+        .then(data => setClasses(Array.isArray(data) ? data : []))
+        .catch(() => setLookupError(t('loadOptionsFailed')))
     ]).finally(() => setLoadingOptions(false))
-  }, [])
+  }, [t])
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -67,7 +69,7 @@ function ClassBookingForm({ onClassBookingCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create class booking.')
+        if (!response.ok) throw new Error(data.error || t('bookingCreateFailed'))
         return data
       })
       .then(() => {
@@ -77,41 +79,83 @@ function ClassBookingForm({ onClassBookingCreated }) {
         setStatus('')
         onClassBookingCreated()
       })
-      .then(() => setFeedback({ type: 'success', message: 'Class booking created successfully.' }))
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create class booking.' }))
+      .then(() => setFeedback({ type: 'success', message: t('bookingCreated') }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('bookingCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
   return (
-    <section className="class-booking-form-section"><div className="class-booking-form-heading"><div className="class-booking-form-icon"><CalendarCheck size={19} /></div><div><h2>Book a Class</h2><p>Reserve a place for a member in a scheduled class.</p></div></div><form className="class-booking-form" onSubmit={handleSubmit}><FeedbackMessage message={lookupError} />
-      <div className="class-booking-form-grid"><label className="class-booking-field"><span>Member</span><div className="class-booking-input-wrap"><UserRound size={16} /><select value={memberId} onChange={e => setMemberId(e.target.value)} required>
-        <option value="">-- Select a member --</option>
-        {members.map(member => (
-          <option key={member.member_id} value={member.member_id}>{member.name}</option>
-        ))}
-      </select></div>
-      {errors.memberId && <small className="class-booking-field-error">{errors.memberId}</small>}</label>
+    <section className="class-booking-form-section">
+      <div className="class-booking-form-heading">
+        <div className="class-booking-form-icon">
+          <CalendarCheck size={19} />
+        </div>
+        <div>
+          <h2>{t('bookClass')}</h2>
+          <p>{t('bookClassDescription')}</p>
+        </div>
+      </div>
+      <form className="class-booking-form" onSubmit={handleSubmit}>
+        <FeedbackMessage message={lookupError} />
+        <div className="class-booking-form-grid">
+          <label className="class-booking-field">
+            <span>{t('member', { ns: 'common' })}</span>
+            <div className="class-booking-input-wrap">
+              <UserRound size={16} />
+              <select value={memberId} onChange={e => setMemberId(e.target.value)} required>
+                <option value="">{t('selectMember')}</option>
+                {members.map(member => (
+                  <option key={member.member_id} value={member.member_id}>{member.name}</option>
+                ))}
+              </select>
+            </div>
+            {errors.memberId && <small className="class-booking-field-error">{errors.memberId}</small>}
+          </label>
 
-      <label className="class-booking-field"><span>Class</span><div className="class-booking-input-wrap"><Dumbbell size={16} /><select value={classId} onChange={e => setClassId(e.target.value)} required>
-        <option value="">-- Select a class --</option>
-        {classes.map(gymClass => (
-          <option key={gymClass.class_id} value={gymClass.class_id}>{gymClass.class_name} - {gymClass.schedule_time}</option>
-        ))}
-      </select></div>
-      {errors.classId && <small className="class-booking-field-error">{errors.classId}</small>}</label>
+          <label className="class-booking-field">
+            <span>{t('classesTitle')}</span>
+            <div className="class-booking-input-wrap">
+              <Dumbbell size={16} />
+              <select value={classId} onChange={e => setClassId(e.target.value)} required>
+                <option value="">{t('selectClass')}</option>
+                {classes.map(gymClass => (
+                  <option key={gymClass.class_id} value={gymClass.class_id}>{gymClass.class_name} - {gymClass.schedule_time}</option>
+                ))}
+              </select>
+            </div>
+            {errors.classId && <small className="class-booking-field-error">{errors.classId}</small>}
+          </label>
 
-      <label className="class-booking-field"><span>Booking date</span><div className="class-booking-input-wrap"><CalendarDays size={16} /><input type="datetime-local" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required /></div>
-      {errors.bookingDate && <small className="class-booking-field-error">{errors.bookingDate}</small>}</label>
+          <label className="class-booking-field">
+            <span>{t('bookingDate')}</span>
+            <div className="class-booking-input-wrap">
+              <CalendarDays size={16} />
+              <input type="datetime-local" value={bookingDate} onChange={e => setBookingDate(e.target.value)} required />
+            </div>
+            {errors.bookingDate && <small className="class-booking-field-error">{errors.bookingDate}</small>}
+          </label>
 
-      <label className="class-booking-field"><span>Status</span><div className="class-booking-input-wrap"><CalendarCheck size={16} /><select value={status} onChange={e => setStatus(e.target.value)} required>
-        <option value="">-- Select status --</option>
-        <option value="booked">Booked</option>
-        <option value="cancelled">Cancelled</option>
-        <option value="completed">Completed</option>
-      </select></div></label></div>
-      <FeedbackMessage message={feedback?.message} type={feedback?.type} />
-      <div className="class-booking-form-actions"><button type="submit" className="class-booking-primary-button" disabled={submitting || loadingOptions}><Save size={16} /> {submitting ? 'Creating...' : loadingOptions ? 'Loading options...' : 'Add Booking'}</button></div>
-    </form></section>
+          <label className="class-booking-field">
+            <span>{t('status', { ns: 'common' })}</span>
+            <div className="class-booking-input-wrap">
+              <CalendarCheck size={16} />
+              <select value={status} onChange={e => setStatus(e.target.value)} required>
+                <option value="">{t('selectStatus')}</option>
+                <option value="booked">{t('booked')}</option>
+                <option value="cancelled">{t('cancelled')}</option>
+                <option value="completed">{t('completed')}</option>
+              </select>
+            </div>
+          </label>
+        </div>
+        <FeedbackMessage message={feedback?.message} type={feedback?.type} />
+        <div className="class-booking-form-actions">
+          <button type="submit" className="class-booking-primary-button" disabled={submitting || loadingOptions}>
+            <Save size={16} /> {submitting ? t('creating') : loadingOptions ? t('loadingOptions') : t('addBooking')}
+          </button>
+        </div>
+      </form>
+    </section>
   )
 }
 

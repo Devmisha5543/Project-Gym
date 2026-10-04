@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { paymentSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -13,6 +14,7 @@ import {
 import FeedbackMessage from './FeedbackMessage'
 
 function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete }) {
+  const { t } = useTranslation(['payments', 'common'])
   const [memberships, setMemberships] = useState([])
   const [membershipId, setMembershipId] = useState('')
   const [amount, setAmount] = useState('')
@@ -47,12 +49,12 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
       .catch(error => {
         console.error('Failed to load memberships:', error)
         setMemberships([])
-        setLookupError('Unable to load memberships. Please try again.')
+        setLookupError(t('membershipsLoadFailed'))
       })
       .finally(() => {
         setLoadingMemberships(false)
       })
-  }, [renewalMembershipId])
+  }, [renewalMembershipId, t])
 
   function handleMembershipChange(event) {
     const selectedMembershipId = event.target.value
@@ -122,7 +124,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
 
         if (!response.ok) {
           throw new Error(
-            data.error || 'Failed to record payment'
+            data.error || t('paymentRecordFailed')
           )
         }
 
@@ -138,7 +140,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
         if (renewalMembershipId) onRenewalComplete?.()
         else {
           onPaymentCreated()
-          setSuccessMessage('Payment recorded successfully.')
+          setSuccessMessage(t('paymentRecorded'))
         }
       })
       .catch(error => {
@@ -147,7 +149,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
         setErrors({
           general:
           error.message ||
-          'Unable to record payment. Please try again.'
+          t('paymentRecordFailed')
         })
       })
       .finally(() => setSubmitting(false))
@@ -163,10 +165,10 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
         </div>
 
         <div>
-          <h2>{renewalMembershipId ? 'Renew Membership' : 'Record Payment'}</h2>
+          <h2>{renewalMembershipId ? t('renewMembership') : t('recordPayment')}</h2>
 
           <p>
-            {renewalMembershipId ? 'Record the renewal payment to reactivate this membership.' : 'Add a payment to an existing membership.'}
+            {renewalMembershipId ? t('renewMembershipDescription') : t('recordPaymentDescription')}
           </p>
         </div>
 
@@ -191,7 +193,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
           {/* Membership */}
           <label className="payment-field payment-field-wide">
 
-            <span>Member & Membership Plan</span>
+            <span>{t('memberAndPlan')}</span>
 
             <div className="payment-input-wrap">
 
@@ -205,7 +207,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
               >
 
                 <option value="">
-                  Select a member
+                  {t('selectMember')}
                 </option>
 
                 {memberships
@@ -240,7 +242,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
           {/* Amount */}
           <label className="payment-field">
 
-            <span>Amount</span>
+            <span>{t('amount')}</span>
 
             <div className="payment-input-wrap">
 
@@ -269,7 +271,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
           {/* Payment Date */}
           <label className="payment-field">
 
-            <span>Payment date</span>
+            <span>{t('paymentDate')}</span>
 
             <div className="payment-input-wrap">
 
@@ -297,7 +299,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
           {/* Payment Method */}
           <label className="payment-field">
 
-            <span>Payment method</span>
+            <span>{t('paymentMethod')}</span>
 
             <div className="payment-input-wrap">
 
@@ -310,7 +312,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
                   setPaymentMethod(e.target.value)
                 }
                 required
-                placeholder="e.g. Cash or card"
+                placeholder={t('paymentMethodPlaceholder')}
               />
 
             </div>
@@ -327,7 +329,7 @@ function PaymentForm({ onPaymentCreated, renewalMembershipId, onRenewalComplete 
             disabled={submitting || loadingMemberships}
           >
             <Save size={16} />
-            {submitting ? 'Recording...' : loadingMemberships ? 'Loading memberships...' : 'Add Payment'}
+            {submitting ? t('recording') : loadingMemberships ? t('loadingMemberships') : t('addPayment')}
           </button>
 
         </div>

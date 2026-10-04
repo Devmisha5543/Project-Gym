@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { branchSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { Building2, MapPin, Phone, Plus, Save } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function BranchForm({ onBranchCreated }) {
+  const { t } = useTranslation(['people', 'common'])
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
@@ -39,7 +41,7 @@ function BranchForm({ onBranchCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create branch.')
+        if (!response.ok) throw new Error(data.error || t('branchCreateFailed'))
         return data
       })
       .then(() => {
@@ -48,9 +50,9 @@ function BranchForm({ onBranchCreated }) {
         setPhone('')
         setCity('')
         onBranchCreated()
-        setFeedback({ type: 'success', message: 'Branch created successfully.' })
+        setFeedback({ type: 'success', message: t('branchCreated') })
       })
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create branch.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('branchCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
@@ -61,43 +63,43 @@ function BranchForm({ onBranchCreated }) {
           <Plus size={19} />
         </div>
         <div>
-          <h2>Add New Branch</h2>
-          <p>Register a location for your gym network.</p>
+          <h2>{t('addNewBranch')}</h2>
+          <p>{t('registerBranch')}</p>
         </div>
       </div>
 
       <form className="branch-form" onSubmit={handleSubmit}>
         <div className="branch-form-grid">
           <label className="branch-field">
-            <span>Branch name</span>
+            <span>{t('branchName')}</span>
             <div className="branch-input-wrap">
               <Building2 size={16} />
-              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Downtown Gym" />
+              <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder={t('branchPlaceholder')} />
             </div>
             {errors.name && <small className="branch-field-error">{errors.name}</small>}
           </label>
 
           <label className="branch-field">
-            <span>City</span>
+            <span>{t('city')}</span>
             <div className="branch-input-wrap">
               <MapPin size={16} />
-              <input type="text" value={city} onChange={e => setCity(e.target.value)} required placeholder="Enter city" />
+              <input type="text" value={city} onChange={e => setCity(e.target.value)} required placeholder={t('enterCity')} />
             </div>
           </label>
 
           <label className="branch-field">
-            <span>Address</span>
+            <span>{t('streetAddress')}</span>
             <div className="branch-input-wrap">
               <MapPin size={16} />
-              <input type="text" value={address} onChange={e => setAddress(e.target.value)} required placeholder="Street address" />
+              <input type="text" value={address} onChange={e => setAddress(e.target.value)} required placeholder={t('streetAddress')} />
             </div>
           </label>
 
           <label className="branch-field">
-            <span>Phone</span>
+            <span>{t('branchPhone')}</span>
             <div className="branch-input-wrap">
               <Phone size={16} />
-              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder="Branch phone number" />
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} required placeholder={t('branchPhone')} />
             </div>
             {errors.phone && <small className="branch-field-error">{errors.phone}</small>}
           </label>
@@ -106,7 +108,7 @@ function BranchForm({ onBranchCreated }) {
         <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="branch-form-actions">
           <button type="submit" className="branch-primary-button" disabled={submitting}>
-            <Save size={16} /> {submitting ? 'Creating...' : 'Add Branch'}
+            <Save size={16} /> {submitting ? t('creating') : t('addBranch')}
           </button>
         </div>
       </form>

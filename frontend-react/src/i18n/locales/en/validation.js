@@ -1,0 +1,21 @@
+export default {
+  required: 'This field is required.',
+  nameRequired: 'Name is required.',
+  nameMin: 'Name must be at least {{count}} characters.',
+  phoneRequired: 'Phone is required.',
+  phoneDigits: 'Phone number must contain 7 to 15 digits.',
+  validEmail: 'Must be a valid email address.',
+  validEmailPlease: 'Please enter a valid email address.',
+  validDate: 'Date is required.',
+  positiveNumber: 'Value must be greater than 0.',
+  positiveInteger: 'Value must be a positive whole number.',
+  nonnegativeInteger: 'Value must be zero or a positive whole number.',
+  passwordMin: 'Password must be at least {{count}} characters.',
+  passwordsMatch: 'Passwords do not match.',
+  selectBranch: 'Please select a branch.',
+  selectTrainer: 'Please select a trainer.',
+  selectMember: 'Please select a member.',
+  selectPlan: 'Please select a membership plan.',
+  checkDetails: 'Please check the information and try again.',
+  certificationMin: 'Certification must be at least {{count}} characters.'
+}

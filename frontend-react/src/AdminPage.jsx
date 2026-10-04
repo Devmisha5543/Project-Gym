@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import AdminList from './AdminList'
@@ -7,12 +8,13 @@ import { Receipt, ShieldCheck } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function AdminPage() {
+  const { t } = useTranslation(['admin', 'common'])
   const [admins, setAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [pageError, setPageError] = useState('')
   const [operationFeedback, setOperationFeedback] = useState(null)
 
-  function loadAdmins() {
+  const loadAdmins = useCallback(() => {
     setLoading(true)
     setPageError('')
 
@@ -21,25 +23,24 @@ function AdminPage() {
         const data = await response.json()
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to load admins')
+          throw new Error(data.error || t('adminLoadFailed'))
         }
 
         return data
       })
-      .then(data => setAdmins(data))
+      .then(data => setAdmins(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load admins:', error)
         setAdmins([])
-        setPageError(error.message)
+        setPageError(error.message || t('adminLoadFailed'))
       })
       .finally(() => setLoading(false))
-  }
+  }, [t])
 
   useEffect(() => {
     const loadTimer = setTimeout(loadAdmins, 0)
-
     return () => clearTimeout(loadTimer)
-  }, [])
+  }, [loadAdmins])
 
   function updateAdmin(adminId, data) {
     setOperationFeedback(null)
@@ -54,24 +55,24 @@ function AdminPage() {
         const result = await response.json()
 
         if (!response.ok) {
-          throw new Error(result.error || 'Failed to update admin')
+          throw new Error(result.error || t('adminUpdateFailed'))
         }
 
         return result
       })
       .then(() => {
         loadAdmins()
-        setOperationFeedback({ type: 'success', message: 'Administrator updated successfully.' })
+        setOperationFeedback({ type: 'success', message: t('adminUpdated') })
       })
       .catch(error => {
-        setOperationFeedback({ type: 'error', message: error.message || 'Unable to update administrator.' })
+        setOperationFeedback({ type: 'error', message: error.message || t('adminUpdateFailed') })
         throw error
       })
   }
 
   function deleteAdmin(adminId) {
     const confirmed = window.confirm(
-      'Are you sure you want to delete this administrator?'
+      t('deleteAdminConfirm')
     )
 
     if (!confirmed) {
@@ -86,18 +87,18 @@ function AdminPage() {
         const data = await response.json()
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to delete admin')
+          throw new Error(data.error || t('adminDeleteFailed'))
         }
 
         return data
       })
       .then(() => {
         loadAdmins()
-        setOperationFeedback({ type: 'success', message: 'Administrator deleted successfully.' })
+        setOperationFeedback({ type: 'success', message: t('adminDeleted') })
       })
       .catch(error => {
         console.error('Failed to delete admin:', error)
-        setOperationFeedback({ type: 'error', message: error.message || 'Unable to delete administrator.' })
+        setOperationFeedback({ type: 'error', message: error.message || t('adminDeleteFailed') })
       })
   }
 
@@ -106,12 +107,12 @@ function AdminPage() {
 
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">SYSTEM</p>
+          <p className="page-eyebrow">{t('eyebrow')}</p>
 
-          <h1>Admins</h1>
+          <h1>{t('adminTitle')}</h1>
 
           <p className="page-description">
-            Manage administrator accounts and access securely.
+            {t('adminDescription')}
           </p>
         </div>
 
@@ -120,7 +121,7 @@ function AdminPage() {
 
           <span>{admins.length}</span>
 
-          <small>Visible Admins</small>
+          <small>{t('visibleAdmins')}</small>
         </div>
       </div>
 
@@ -139,11 +140,9 @@ function AdminPage() {
         <div className="admin-state">
           <div className="loading-spinner"></div>
 
-          <h3>Loading administrators</h3>
+          <h3>{t('loadingAdmins')}</h3>
 
-          <p>
-            Checking available admin records.
-          </p>
+          <p>{t('checkingRecords')}</p>
         </div>
       ) : (
         <AdminList

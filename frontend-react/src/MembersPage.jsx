@@ -6,6 +6,7 @@ import MemberList from './MemberList'
 import MemberForm from './MemberForm'
 import { Search, Users, Building2, Filter, X, AlertCircle, RotateCcw } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
+import { useTranslation } from 'react-i18next'
 
 function subscribeToMobile(callback) {
   const mql = window.matchMedia('(max-width: 768px)')
@@ -22,6 +23,7 @@ function getMobileServerSnapshot() {
 }
 
 function MembersPage() {
+  const { t } = useTranslation('members')
   const navigate = useNavigate()
   const isMobile = useSyncExternalStore(
     subscribeToMobile,
@@ -107,7 +109,7 @@ function MembersPage() {
       })
       .catch(error => {
         console.error('Failed to load members and memberships:', error)
-        setPageError('Unable to load members and membership details. Please try again.')
+        setPageError('loadFailed')
       })
       .finally(() => {
         setLoading(false)
@@ -175,13 +177,13 @@ function MembersPage() {
 
         <div>
           <p className="page-eyebrow">
-            GYM MANAGEMENT
+            {t('eyebrow')}
           </p>
 
-          <h1>Members</h1>
+          <h1>{t('title')}</h1>
 
           <p className="page-description">
-            Manage your gym members and their information.
+            {t('description')}
           </p>
         </div>
 
@@ -194,7 +196,7 @@ function MembersPage() {
           </span>
 
           <small>
-            Total Members
+            {t('totalMembers')}
           </small>
 
         </div>
@@ -216,7 +218,7 @@ function MembersPage() {
         <div className="search-box">
 
           <label className="search-box-label">
-            Search Members
+            {t('searchMembers')}
           </label>
 
           <div className="field-with-icon">
@@ -225,7 +227,7 @@ function MembersPage() {
 
             <input
               type="text"
-              placeholder="Search by name or phone..."
+              placeholder={t('searchPlaceholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -235,7 +237,7 @@ function MembersPage() {
                 type="button"
                 className="clear-search"
                 onClick={() => setSearch('')}
-                aria-label="Clear search"
+                aria-label={t('clearSearch')}
               >
                 ×
               </button>
@@ -251,10 +253,10 @@ function MembersPage() {
             type="button"
             className={`mobile-filter-trigger ${(branchFilter || genderFilter) ? 'active' : ''}`}
             onClick={openMobileFilter}
-            aria-label="Filter members"
+            aria-label={t('filterMembers')}
           >
             <Filter size={17} />
-            <span>Filter</span>
+            <span>{t('filter')}</span>
             {(branchFilter || genderFilter) && (
               <span className="mobile-filter-dot" />
             )}
@@ -266,7 +268,7 @@ function MembersPage() {
           <div className="filter-box">
 
             <label>
-              Branch
+              {t('branch')}
             </label>
 
             <div className="field-with-icon">
@@ -279,7 +281,7 @@ function MembersPage() {
               >
 
                 <option value="">
-                  All Branches
+                  {t('allBranchesTitleCase')}
                 </option>
 
                 {branches.map(branch => (
@@ -303,7 +305,7 @@ function MembersPage() {
           <div className="filter-box">
 
             <label>
-              Gender
+              {t('gender')}
             </label>
 
             <div className="field-with-icon">
@@ -316,15 +318,15 @@ function MembersPage() {
               >
 
                 <option value="">
-                  All Genders
+                  {t('allGendersTitleCase')}
                 </option>
 
                 <option value="Male">
-                  Male
+                  {t('male')}
                 </option>
 
                 <option value="Female">
-                  Female
+                  {t('female')}
                 </option>
 
               </select>
@@ -347,18 +349,18 @@ function MembersPage() {
             className="mobile-filter-sheet"
             role="dialog"
             aria-modal="true"
-            aria-label="Filter members"
+            aria-label={t('filterMembers')}
             onClick={e => e.stopPropagation()}
           >
             <div className="mobile-sheet-drag-handle" />
 
             <div className="mobile-filter-header">
-              <h3>Filters</h3>
+              <h3>{t('filters')}</h3>
               <button
                 type="button"
                 className="mobile-filter-close"
                 onClick={() => setMobileFilterOpen(false)}
-                aria-label="Close filter options"
+                aria-label={t('closeFilters')}
               >
                 <X size={18} />
               </button>
@@ -366,14 +368,14 @@ function MembersPage() {
 
             <div className="mobile-filter-body">
               <div className="mobile-filter-group">
-                <label>Branch</label>
+                <label>{t('branch')}</label>
                 <div className="mobile-filter-select-wrap">
                   <Building2 size={17} />
                   <select
                     value={tempBranch}
                     onChange={e => setTempBranch(e.target.value)}
                   >
-                    <option value="">All branches</option>
+                    <option value="">{t('allBranches')}</option>
                     {branches.map(branch => (
                       <option key={branch.branch_id} value={branch.branch_id}>
                         {branch.name}
@@ -384,16 +386,16 @@ function MembersPage() {
               </div>
 
               <div className="mobile-filter-group">
-                <label>Gender</label>
+                <label>{t('gender')}</label>
                 <div className="mobile-filter-select-wrap">
                   <Users size={17} />
                   <select
                     value={tempGender}
                     onChange={e => setTempGender(e.target.value)}
                   >
-                    <option value="">All genders</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="">{t('allGenders')}</option>
+                    <option value="Male">{t('male')}</option>
+                    <option value="Female">{t('female')}</option>
                   </select>
                 </div>
               </div>
@@ -405,14 +407,14 @@ function MembersPage() {
                 className="mobile-filter-clear-btn"
                 onClick={clearMobileFilter}
               >
-                Clear
+                {t('clear')}
               </button>
               <button
                 type="button"
                 className="mobile-filter-apply-btn"
                 onClick={applyMobileFilter}
               >
-                Apply
+                {t('apply')}
               </button>
             </div>
           </div>
@@ -423,9 +425,7 @@ function MembersPage() {
       {/* Results */}
       <div className="results-info">
 
-        Showing <strong>{filteredMembers.length}</strong> of{' '}
-
-        <strong>{members.length}</strong> members
+        {t('showingResults', { filtered: filteredMembers.length, total: members.length })}
 
       </div>
 
@@ -438,8 +438,8 @@ function MembersPage() {
     </div>
 
     <div className="member-error-content">
-      <strong>Something went wrong</strong>
-      <span>{pageError}</span>
+      <strong>{t('somethingWentWrong')}</strong>
+      <span>{t(pageError, { defaultValue: t('loadFailed') })}</span>
     </div>
 
     <button
@@ -448,7 +448,7 @@ function MembersPage() {
       onClick={loadMembers}
     >
       <RotateCcw size={15} />
-      Retry
+      {t('retry')}
     </button>
   </div>
 )}
@@ -462,7 +462,7 @@ function MembersPage() {
           <div className="loading-spinner"></div>
 
           <p>
-            Loading members...
+            {t('loadingMembers')}
           </p>
 
         </div>

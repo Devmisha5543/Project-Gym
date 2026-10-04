@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useGym } from './GymContext'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import { useTranslation } from 'react-i18next'
+import LanguageSelector from './LanguageSelector'
 import {
   Building2,
   Save,
@@ -16,6 +18,7 @@ import {
 } from 'lucide-react'
 
 function SettingsPage() {
+  const { t } = useTranslation(['settings', 'common', 'validation'])
   const { gym, loading, error, refreshGym, updateGym } = useGym()
 
   const [formData, setFormData] = useState({
@@ -61,12 +64,12 @@ function SettingsPage() {
     // Validate inputs
     const errors = {}
     if (!formData.name || !formData.name.trim()) {
-      errors.name = 'Gym name is required.'
+      errors.name = 'required'
     }
     if (formData.email && formData.email.trim()) {
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailPattern.test(formData.email.trim())) {
-        errors.email = 'Please enter a valid email address.'
+        errors.email = 'validEmail'
       }
     }
 
@@ -106,17 +109,17 @@ function SettingsPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setSubmitError(data.error || 'Failed to update gym settings.')
+      setSubmitError('updateFailed')
         return
       }
 
       // Update shared gym context
       const updatedGym = data.gym || data
       updateGym(updatedGym)
-      setSuccessMessage('Gym settings saved successfully.')
+      setSuccessMessage('saveSuccess')
     } catch (err) {
       console.error('Failed to save gym settings:', err)
-      setSubmitError('Unable to connect to the server. Please try again.')
+      setSubmitError('networkError')
     } finally {
       setIsSaving(false)
     }
@@ -128,18 +131,18 @@ function SettingsPage() {
       <div className="page-container settings-page">
         <div className="page-header">
           <div>
-            <p className="page-eyebrow">ORGANIZATION</p>
-            <h1>Gym Settings</h1>
+            <p className="page-eyebrow">{t('eyebrow')}</p>
+            <h1>{t('title')}</h1>
             <p className="page-description">
-              Manage the identity and contact information of your gym.
+              {t('description')}
             </p>
           </div>
         </div>
 
         <div className="branch-state">
           <RefreshCw size={24} className="refresh-icon-spinning" style={{ color: '#c48bff' }} />
-          <h3>Loading gym details...</h3>
-          <p>Retrieving organization settings from the server.</p>
+          <h3>{t('loadingGym')}</h3>
+          <p>{t('loadingDescription')}</p>
         </div>
       </div>
     )
@@ -151,25 +154,25 @@ function SettingsPage() {
       <div className="page-container settings-page">
         <div className="page-header">
           <div>
-            <p className="page-eyebrow">ORGANIZATION</p>
-            <h1>Gym Settings</h1>
+            <p className="page-eyebrow">{t('eyebrow')}</p>
+            <h1>{t('title')}</h1>
             <p className="page-description">
-              Manage the identity and contact information of your gym.
+              {t('description')}
             </p>
           </div>
         </div>
 
         <div className="branch-state">
           <AlertCircle size={28} style={{ color: '#f87171' }} />
-          <h3 style={{ color: '#f87171' }}>Failed to load gym details</h3>
-          <p>{error}</p>
+          <h3 style={{ color: '#f87171' }}>{t('loadFailed')}</h3>
+          <p>{t('common:unexpectedError')}</p>
           <button
             type="button"
             onClick={refreshGym}
             className="branch-primary-button"
             style={{ marginTop: '16px' }}
           >
-            <RefreshCw size={15} /> Retry
+            <RefreshCw size={15} /> {t('common:retry')}
           </button>
         </div>
       </div>
@@ -181,10 +184,10 @@ function SettingsPage() {
       {/* HEADER */}
       <div className="page-header">
         <div>
-          <p className="page-eyebrow">ORGANIZATION</p>
-          <h1>Gym Settings</h1>
+          <p className="page-eyebrow">{t('eyebrow')}</p>
+          <h1>{t('title')}</h1>
           <p className="page-description">
-            Manage the identity and contact information of your gym.
+            {t('description')}
           </p>
         </div>
 
@@ -194,7 +197,7 @@ function SettingsPage() {
         >
           <Building2 size={19} />
           <span>#{gym?.gym_id ?? 1}</span>
-          <small>Organization ID</small>
+          <small>{t('organizationId')}</small>
         </div>
       </div>
 
@@ -202,16 +205,24 @@ function SettingsPage() {
       {submitError && (
         <div className="settings-feedback-error">
           <AlertCircle size={17} />
-          <span>{submitError}</span>
+          <span>{t(submitError === 'networkError' ? 'common:networkError' : submitError)}</span>
         </div>
       )}
 
       {successMessage && (
         <div className="settings-feedback-success">
           <CheckCircle2 size={17} />
-          <span>{successMessage}</span>
+          <span>{t(successMessage)}</span>
         </div>
       )}
+
+      <section className="settings-form-section settings-language-section">
+        <div className="settings-form-heading">
+          <div className="settings-form-icon"><span aria-hidden="true">文</span></div>
+          <div><h2>{t('language')}</h2><p>{t('languageDescription')}</p></div>
+        </div>
+        <LanguageSelector />
+      </section>
 
       {/* MAIN CONTENT: GYM PROFILE */}
       <section className="settings-form-section">
@@ -220,8 +231,8 @@ function SettingsPage() {
             <Building2 size={19} />
           </div>
           <div>
-            <h2>Gym Profile</h2>
-            <p>Update your organization's public details, contact info, and branding.</p>
+            <h2>{t('profile')}</h2>
+            <p>{t('profileDescription')}</p>
           </div>
         </div>
 
@@ -229,26 +240,26 @@ function SettingsPage() {
           <div className="settings-form-grid">
             {/* GYM NAME */}
             <label className="settings-field">
-              <span>Gym Name *</span>
+              <span>{t('gymName')} *</span>
               <div className="settings-input-wrap">
                 <Building2 size={16} />
                 <input
                   type="text"
                   value={formData.name}
                   onChange={e => handleChange('name', e.target.value)}
-                  placeholder="e.g. Downtown Fitness"
+                  placeholder={t('gymName')}
                   required
                   disabled={isSaving}
                 />
               </div>
               {fieldErrors.name && (
-                <small className="settings-field-error">{fieldErrors.name}</small>
+                <small className="settings-field-error">{t(`validation:${fieldErrors.name}`)}</small>
               )}
             </label>
 
             {/* CURRENCY */}
             <label className="settings-field">
-              <span>Currency</span>
+              <span>{t('currency')}</span>
               <div className="settings-input-wrap">
                 <Coins size={16} />
                 <input
@@ -263,14 +274,14 @@ function SettingsPage() {
 
             {/* PHONE */}
             <label className="settings-field">
-              <span>Phone</span>
+              <span>{t('common:phone')}</span>
               <div className="settings-input-wrap">
                 <Phone size={16} />
                 <input
                   type="text"
                   value={formData.phone}
                   onChange={e => handleChange('phone', e.target.value)}
-                  placeholder="e.g. +251 91 100 0000"
+                  placeholder={t('common:phone')}
                   disabled={isSaving}
                 />
               </div>
@@ -278,32 +289,32 @@ function SettingsPage() {
 
             {/* EMAIL */}
             <label className="settings-field">
-              <span>Email</span>
+              <span>{t('common:email')}</span>
               <div className="settings-input-wrap">
                 <Mail size={16} />
                 <input
                   type="email"
                   value={formData.email}
                   onChange={e => handleChange('email', e.target.value)}
-                  placeholder="e.g. contact@yourgym.com"
+                  placeholder="name@example.com"
                   disabled={isSaving}
                 />
               </div>
               {fieldErrors.email && (
-                <small className="settings-field-error">{fieldErrors.email}</small>
+                <small className="settings-field-error">{t(`validation:${fieldErrors.email}`)}</small>
               )}
             </label>
 
             {/* ADDRESS */}
             <label className="settings-field">
-              <span>Address</span>
+              <span>{t('common:address')}</span>
               <div className="settings-input-wrap">
                 <MapPin size={16} />
                 <input
                   type="text"
                   value={formData.address}
                   onChange={e => handleChange('address', e.target.value)}
-                  placeholder="e.g. 123 Fitness St, Addis Ababa"
+                  placeholder={t('common:address')}
                   disabled={isSaving}
                 />
               </div>
@@ -311,14 +322,14 @@ function SettingsPage() {
 
             {/* LOGO URL */}
             <label className="settings-field">
-              <span>Logo URL</span>
+              <span>{t('logoUrl')}</span>
               <div className="settings-input-wrap">
                 <LinkIcon size={16} />
                 <input
                   type="url"
                   value={formData.logo_url}
                   onChange={e => handleChange('logo_url', e.target.value)}
-                  placeholder="e.g. https://example.com/logo.png"
+                  placeholder="https://example.com/logo.png"
                   disabled={isSaving}
                 />
               </div>
@@ -326,12 +337,12 @@ function SettingsPage() {
                 <div className="logo-preview-box">
                   <img
                     src={formData.logo_url}
-                    alt="Logo preview"
+                    alt={t('liveLogoPreview')}
                     className="logo-preview-img"
                     onError={(e) => { e.currentTarget.style.display = 'none' }}
                     onLoad={(e) => { e.currentTarget.style.display = 'block' }}
                   />
-                  <small style={{ color: '#888' }}>Live logo preview</small>
+                  <small style={{ color: '#888' }}>{t('liveLogoPreview')}</small>
                 </div>
               )}
             </label>
@@ -345,11 +356,11 @@ function SettingsPage() {
             >
               {isSaving ? (
                 <>
-                  <RefreshCw size={16} className="refresh-icon-spinning" /> Saving Changes...
+                  <RefreshCw size={16} className="refresh-icon-spinning" /> {t('common:saving')}
                 </>
               ) : (
                 <>
-                  <Save size={16} /> Save Changes
+                  <Save size={16} /> {t('saveSettings')}
                 </>
               )}
             </button>

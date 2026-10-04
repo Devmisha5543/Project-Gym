@@ -15,6 +15,7 @@ import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { memberSchema } from './schemas'
 import MemberPhoto from './MemberPhoto'
+import { useTranslation } from 'react-i18next'
 
 function MemberDetail({
   member,
@@ -26,6 +27,7 @@ function MemberDetail({
   onFeedback,
   onClose
 }) {
+  const { t } = useTranslation('members')
   const [editing, setEditing] = useState(false)
   const [deletePending, setDeletePending] = useState(false)
   const [editValues, setEditValues] = useState({})
@@ -115,7 +117,7 @@ function MemberDetail({
       .then(response => (
         response.json().catch(() => ({})).then(data => {
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to update member')
+            throw new Error(t('updateMemberFailed'))
           }
 
           return data
@@ -134,7 +136,7 @@ function MemberDetail({
       })
       .catch(error => {
         console.error('Failed to update member:', error)
-        onFeedback?.(error.message || 'Failed to update member.', 'error')
+        onFeedback?.('members:updateMemberFailed', 'error')
       })
       .finally(() => setSaving(false))
   }
@@ -148,7 +150,7 @@ function MemberDetail({
       .then(response => (
         response.json().catch(() => ({})).then(data => {
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to delete member')
+            throw new Error(t('deleteMemberFailed'))
           }
 
           return data
@@ -161,7 +163,7 @@ function MemberDetail({
       })
       .catch(error => {
         console.error('Failed to delete member:', error)
-        onFeedback?.(error.message || 'Failed to delete member.', 'error')
+        onFeedback?.('members:deleteMemberFailed', 'error')
       })
       .finally(() => setDeleting(false))
   }
@@ -188,16 +190,16 @@ function MemberDetail({
           className="member-avatar member-avatar-large member-profile-photo-button"
           onClick={() => photoUrl && setPhotoPreviewOpen(true)}
           disabled={!photoUrl}
-          aria-label={`View ${member.name}'s profile photo`}
+          aria-label={t('viewMemberProfilePhoto', { name: member.name })}
         >
           <MemberPhoto key={photoUrl || 'member-profile'} member={member} photoUrl={photoUrl} alt={member.name} />
         </button>
         <div>
-          <span className="member-detail-label">Member profile</span>
+          <span className="member-detail-label">{t('memberProfile')}</span>
           <h4>{editing ? editValues.name : member.name}</h4>
         </div>
         {onClose && (
-          <button type="button" className="member-detail-close" onClick={onClose} aria-label="Close member details">
+          <button type="button" className="member-detail-close" onClick={onClose} aria-label={t('closeDetails')}>
             <X size={19} />
           </button>
         )}
@@ -205,65 +207,65 @@ function MemberDetail({
 
       {editing ? (
         <div className="member-edit-fields">
-          <label>Full name<input value={editValues.name} onChange={event => updateEditValue('name', event.target.value)} /></label>
-          <label>Phone<input value={editValues.phone} onChange={event => updateEditValue('phone', event.target.value)} /></label>
-          <label>Gender<select value={editValues.gender} onChange={event => updateEditValue('gender', event.target.value)}><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option></select></label>
-          <label>Branch<select value={editValues.branch_id} onChange={event => updateEditValue('branch_id', event.target.value)}><option value="">Select a branch</option>{branches?.map(branch => <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>)}</select></label>
-          <label>Address<input value={editValues.address} onChange={event => updateEditValue('address', event.target.value)} /></label>
-          <label>Join Date<input type="date" value={editValues.join_date} onChange={event => updateEditValue('join_date', event.target.value)} /></label>
-          <label className="member-edit-checkbox"><input type="checkbox" checked={editValues.wants_trainer} onChange={event => updateEditValue('wants_trainer', event.target.checked)} />Member wants a personal trainer</label>
+          <label>{t('fullName')}<input value={editValues.name} onChange={event => updateEditValue('name', event.target.value)} /></label>
+          <label>{t('common:phone')}<input value={editValues.phone} onChange={event => updateEditValue('phone', event.target.value)} /></label>
+          <label>{t('gender')}<select value={editValues.gender} onChange={event => updateEditValue('gender', event.target.value)}><option value="">{t('selectGender')}</option><option value="Male">{t('male')}</option><option value="Female">{t('female')}</option></select></label>
+          <label>{t('branch')}<select value={editValues.branch_id} onChange={event => updateEditValue('branch_id', event.target.value)}><option value="">{t('people:selectBranch')}</option>{branches?.map(branch => <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>)}</select></label>
+          <label>{t('common:address')}<input value={editValues.address} onChange={event => updateEditValue('address', event.target.value)} /></label>
+          <label>{t('joinDate')}<input type="date" value={editValues.join_date} onChange={event => updateEditValue('join_date', event.target.value)} /></label>
+          <label className="member-edit-checkbox"><input type="checkbox" checked={editValues.wants_trainer} onChange={event => updateEditValue('wants_trainer', event.target.checked)} />{t('wantsPersonalTrainer')}</label>
           <div className="member-photo-edit">
-            <span>Current Photo</span>
+            <span>{t('currentPhoto')}</span>
             <div className="member-photo-edit-row">
               <div className="member-avatar member-avatar-small"><MemberPhoto key={photoUrl || 'member-edit-photo'} member={member} photoUrl={photoUrl} alt="Member preview" /></div>
               <label className="member-upload-button"><span>{newPhoto ? 'Replace Photo' : 'Change Photo'}</span><input type="file" accept="image/*" onChange={handlePhotoChange} /></label>
-              {newPhoto && <button type="button" className="member-action secondary-action" onClick={() => { setNewPhoto(null); setNewPhotoPreview(null) }}><X size={16} /> Remove selection</button>}
+              {newPhoto && <button type="button" className="member-action secondary-action" onClick={() => { setNewPhoto(null); setNewPhotoPreview(null) }}><X size={16} /> {t('removeSelection')}</button>}
             </div>
           </div>
         </div>
       ) : (
         <div className="member-expanded-details">
-          <div><UserRound size={15} /><span>Full name<strong>{member.name}</strong></span></div>
-          <div><Phone size={15} /><span>Phone<strong>{member.phone || 'Not provided'}</strong></span></div>
-          <div><UserRoundCheck size={15} /><span>Gender<strong>{member.gender || 'Not provided'}</strong></span></div>
-          <div><MapPin size={15} /><span>Branch<strong>{getBranchName()}</strong></span></div>
-          <div><MapPin size={15} /><span>Address<strong>{member.address || 'Not provided'}</strong></span></div>
-          <div><CalendarDays size={15} /><span>Join date<strong>{member.join_date || 'Not provided'}</strong></span></div>
-          <div><UserRoundCheck size={15} /><span>Personal trainer<strong>{member.wants_trainer ? 'Yes' : 'No'}</strong></span></div>
-          <div><UserRoundCheck size={15} /><span>Status<strong>{membership?.status || 'Active'}</strong></span></div>
+          <div><UserRound size={15} /><span>{t('fullName')}<strong>{member.name}</strong></span></div>
+          <div><Phone size={15} /><span>{t('common:phone')}<strong>{member.phone || t('notProvided')}</strong></span></div>
+          <div><UserRoundCheck size={15} /><span>{t('gender')}<strong>{member.gender ? t(member.gender.toLowerCase()) : t('notProvided')}</strong></span></div>
+          <div><MapPin size={15} /><span>{t('branch')}<strong>{getBranchName()}</strong></span></div>
+          <div><MapPin size={15} /><span>{t('common:address')}<strong>{member.address || t('notProvided')}</strong></span></div>
+          <div><CalendarDays size={15} /><span>{t('joinDate')}<strong>{member.join_date || t('notProvided')}</strong></span></div>
+          <div><UserRoundCheck size={15} /><span>{t('personalTrainer')}<strong>{member.wants_trainer ? t('yes') : t('no')}</strong></span></div>
+          <div><UserRoundCheck size={15} /><span>{t('common:status')}<strong>{membership?.status ? t(`status.${membership.status}`) : t('active')}</strong></span></div>
           {membership && <MembershipDetails membership={membership} />}
         </div>
       )}
 
       <div className="member-expanded-actions">
         {!editing && membership && getRemainingDays(membership.end_date) < 0 && onRenew && (
-          <button type="button" className="member-action edit-action" onClick={onRenew}><CreditCard size={16} /> Renew</button>
+          <button type="button" className="member-action edit-action" onClick={onRenew}><CreditCard size={16} /> {t('renewShort')}</button>
         )}
         {editing ? (
           <>
-            <button type="button" className="member-action edit-action" onClick={saveMember} disabled={saving || !editValues.name || !editValues.phone}><Save size={16} /> Save Changes</button>
-            <button type="button" className="member-action secondary-action" onClick={cancelEditing} disabled={saving}><X size={16} /> Cancel</button>
+            <button type="button" className="member-action edit-action" onClick={saveMember} disabled={saving || !editValues.name || !editValues.phone}><Save size={16} /> {t('saveChanges')}</button>
+            <button type="button" className="member-action secondary-action" onClick={cancelEditing} disabled={saving}><X size={16} /> {t('common:cancel')}</button>
           </>
         ) : (
-          <button type="button" className="member-action edit-action" onClick={startEditing}><Pencil size={16} /> Edit Member</button>
+          <button type="button" className="member-action edit-action" onClick={startEditing}><Pencil size={16} /> {t('editMember')}</button>
         )}
-        <button type="button" className="member-action delete-action" onClick={() => setDeletePending(true)}><Trash2 size={16} /> Delete</button>
+        <button type="button" className="member-action delete-action" onClick={() => setDeletePending(true)}><Trash2 size={16} /> {t('deleteMember')}</button>
       </div>
 
       {deletePending && (
         <div className="member-delete-confirmation">
-          <strong>Are you sure you want to delete this member?</strong>
-          <span>This action cannot be undone.</span>
+          <strong>{t('deleteConfirm')}</strong>
+          <span>{t('deleteWarning')}</span>
           <div className="member-confirmation-actions">
-            <button type="button" className="member-action secondary-action" onClick={() => setDeletePending(false)} disabled={deleting}>Cancel</button>
-            <button type="button" className="member-action delete-action" onClick={confirmDelete} disabled={deleting}>Delete</button>
+            <button type="button" className="member-action secondary-action" onClick={() => setDeletePending(false)} disabled={deleting}>{t('common:cancel')}</button>
+            <button type="button" className="member-action delete-action" onClick={confirmDelete} disabled={deleting}>{t('common:delete')}</button>
           </div>
         </div>
       )}
 
       {photoPreviewOpen && (
-        <div className="member-photo-preview" role="dialog" aria-modal="true" aria-label={`${member.name} profile photo`} onClick={() => setPhotoPreviewOpen(false)}>
-          <button type="button" className="member-photo-preview-close" onClick={() => setPhotoPreviewOpen(false)} aria-label="Close photo"><X size={20} /></button>
+        <div className="member-photo-preview" role="dialog" aria-modal="true" aria-label={t('memberPhotoProfile', { name: member.name })} onClick={() => setPhotoPreviewOpen(false)}>
+          <button type="button" className="member-photo-preview-close" onClick={() => setPhotoPreviewOpen(false)} aria-label={t('common:close')}><X size={20} /></button>
           <MemberPhoto key={`large-${photoUrl}`} member={member} photoUrl={photoUrl} alt={member.name} />
         </div>
       )}
@@ -272,15 +274,16 @@ function MemberDetail({
 }
 
 function MembershipDetails({ membership }) {
+  const { t } = useTranslation('members')
   const remainingDays = getRemainingDays(membership.end_date)
 
   return (
     <div className="membership-detail-block">
-      <div><CreditCard size={15} /><span>Membership plan<strong>{membership.plan_name || 'Not provided'}</strong></span></div>
-      <div><CalendarDays size={15} /><span>Membership start<strong>{membership.start_date || 'Not provided'}</strong></span></div>
-      <div><CalendarDays size={15} /><span>Membership expiration<strong>{membership.end_date || 'Not provided'}</strong></span></div>
-      <div><UserRoundCheck size={15} /><span>Membership status<strong>{remainingDays < 0 ? 'Expired' : membership.status || 'Not provided'}</strong></span></div>
-      <div><CalendarDays size={15} /><span>Remaining days<strong>{remainingDays === null ? 'Not available' : remainingDays < 0 ? 'Membership expired' : remainingDays}</strong></span></div>
+      <div><CreditCard size={15} /><span>{t('membershipPlanLabel')}<strong>{membership.plan_name || t('notProvided')}</strong></span></div>
+      <div><CalendarDays size={15} /><span>{t('membershipStart')}<strong>{membership.start_date || t('notProvided')}</strong></span></div>
+      <div><CalendarDays size={15} /><span>{t('membershipExpiration')}<strong>{membership.end_date || t('notProvided')}</strong></span></div>
+      <div><UserRoundCheck size={15} /><span>{t('membershipStatus')}<strong>{remainingDays < 0 ? t('expiredMembership') : membership.status ? t(`status.${membership.status}`) : t('notProvided')}</strong></span></div>
+      <div><CalendarDays size={15} /><span>{t('remainingDays')}<strong>{remainingDays === null ? t('notAvailable') : remainingDays < 0 ? t('membershipExpired') : remainingDays}</strong></span></div>
     </div>
   )
 }

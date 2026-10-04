@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { membershipPlanSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -6,6 +7,7 @@ import { Check, CreditCard, DollarSign, Plus, Sparkles } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function MembershipPlanForm({ onMembershipPlanCreated }) {
+  const { t } = useTranslation(['payments', 'common'])
   const [planName, setPlanName] = useState('')
   const [price, setPrice] = useState('')
   const [perks, setPerks] = useState('')
@@ -42,7 +44,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Unable to create membership plan.')
+        if (!response.ok) throw new Error(data.error || t('planCreateFailed'))
         return data
       })
       .then(() => {
@@ -50,9 +52,9 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
         setPrice('')
         setPerks('')
         onMembershipPlanCreated()
-        setFeedback({ type: 'success', message: 'Membership plan created successfully.' })
+        setFeedback({ type: 'success', message: t('planCreated') })
       })
-      .catch(error => setFeedback({ type: 'error', message: error.message || 'Unable to create membership plan.' }))
+      .catch(error => setFeedback({ type: 'error', message: error.message || t('planCreateFailed') }))
       .finally(() => setSubmitting(false))
   }
 
@@ -63,24 +65,24 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
           <Plus size={19} />
         </div>
         <div>
-          <h2>Add New Plan</h2>
-          <p>Set up a plan your members can choose from.</p>
+          <h2>{t('addNewPlan')}</h2>
+          <p>{t('addPlanDescription')}</p>
         </div>
       </div>
 
       <form className="plan-form" onSubmit={handleSubmit}>
         <div className="plan-form-grid">
           <label className="plan-field">
-            <span>Plan name</span>
+            <span>{t('planName')}</span>
             <div className="plan-input-wrap">
               <CreditCard size={16} />
-              <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} required placeholder="e.g. Premium Access" />
+              <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} required placeholder={t('planNamePlaceholder')} />
             </div>
             {errors.planName && <small className="plan-field-error">{errors.planName}</small>}
           </label>
 
           <label className="plan-field">
-            <span>Price</span>
+            <span>{t('price')}</span>
             <div className="plan-input-wrap">
               <DollarSign size={16} />
               <input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} required placeholder="0.00" />
@@ -89,10 +91,10 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
           </label>
 
           <label className="plan-field plan-field-wide">
-            <span>Perks</span>
+            <span>{t('perks')}</span>
             <div className="plan-input-wrap">
               <Sparkles size={16} />
-              <input type="text" value={perks} onChange={e => setPerks(e.target.value)} required placeholder="e.g. Full gym access, classes, sauna" />
+              <input type="text" value={perks} onChange={e => setPerks(e.target.value)} required placeholder={t('perksPlaceholder')} />
             </div>
           </label>
         </div>
@@ -100,7 +102,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
         <FeedbackMessage message={feedback?.message} type={feedback?.type} />
         <div className="plan-form-actions">
           <button type="submit" className="plan-primary-button" disabled={submitting}>
-            <Check size={16} /> {submitting ? 'Creating...' : 'Add Plan'}
+            <Check size={16} /> {submitting ? t('creating', { ns: 'common' }) : t('addPlan')}
           </button>
         </div>
       </form>

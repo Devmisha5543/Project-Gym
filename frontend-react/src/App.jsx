@@ -30,51 +30,52 @@ import SettingsPage from './SettingsPage'
 import { GymProvider, useGym, GymBrandMark } from './GymContext'
 import { Moon, Sun } from 'lucide-react'
 import { ThemeProvider, useTheme } from './ThemeContext'
+import { useTranslation } from 'react-i18next'
 
 
 const navigation = [
   {
-    title: 'Main',
+    title: 'main',
     items: [
-      { path: '/dashboard', label: 'Dashboard' },
-      { path: '/analytics', label: 'Analytics' },
-      { path: '/members', label: 'Members' },
-      { path: '/branches', label: 'Branches' },
-      { path: '/trainers', label: 'Trainers' },
+      { path: '/dashboard', label: 'dashboard' },
+      { path: '/analytics', label: 'analytics' },
+      { path: '/members', label: 'members' },
+      { path: '/branches', label: 'branches' },
+      { path: '/trainers', label: 'trainers' },
     ],
   },
   {
-    title: 'Management',
+    title: 'management',
     items: [
-      { path: '/membershipplans', label: 'Membership Plans' },
+      { path: '/membershipplans', label: 'membershipPlans' },
       {
         path: '/personaltrainingassignments',
-        label: 'PT Assignments',
+        label: 'ptAssignments',
       },
-      { path: '/classes', label: 'Classes' },
-      { path: '/classbookings', label: 'Class Bookings' },
-      { path: '/payments', label: 'Payments' },
-      { path: '/equipment', label: 'Equipment' },
+      { path: '/classes', label: 'classes' },
+      { path: '/classbookings', label: 'classBookings' },
+      { path: '/payments', label: 'payments' },
+      { path: '/equipment', label: 'equipment' },
     ],
   },
   {
-    title: 'Relationships',
+    title: 'relationships',
     items: [
-      { path: '/trainerbranch', label: 'Trainer Branch' },
+      { path: '/trainerbranch', label: 'trainerBranch' },
     ],
   },
   {
-    title: 'System',
+    title: 'system',
     items: [
-      { path: '/admins', label: 'Admins' },
-      { path: '/settings', label: 'Settings' },
+      { path: '/admins', label: 'admins' },
+      { path: '/settings', label: 'settings' },
     ],
   },
 ]
 
 
 function ProtectedLayout() {
-
+  const { t } = useTranslation('navigation')
   const navigate = useNavigate()
   const { gym, loading: gymLoading } = useGym()
   const { theme, toggleTheme } = useTheme()
@@ -101,8 +102,8 @@ function ProtectedLayout() {
           <GymBrandMark logoUrl={gym?.logo_url} name={gymName} />
 
           <div className="brand-text">
-           <h2>{gymLoading ? 'Loading...' : gymName}</h2>
-           <span>Gym Management</span>
+           <h2>{gymLoading ? t('common:loading') : gymName}</h2>
+           <span>{t('gymManagement')}</span>
          </div>
 
         </div>
@@ -119,7 +120,7 @@ function ProtectedLayout() {
             >
 
               <p className="nav-section-title">
-                {section.title}
+                {t(section.title)}
               </p>
 
               {section.items.map(item => (
@@ -135,7 +136,7 @@ function ProtectedLayout() {
                   <span className="nav-link-dot"></span>
 
                   <span>
-                    {item.label}
+                    {t(item.label)}
                   </span>
 
                 </NavLink>
@@ -156,11 +157,11 @@ function ProtectedLayout() {
             type="button"
             className="theme-toggle"
             onClick={toggleTheme}
-            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            aria-label={t(theme === 'dark' ? 'switchLight' : 'switchDark')}
             aria-pressed={theme === 'light'}
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+            <span>{t(theme === 'dark' ? 'lightMode' : 'darkMode')}</span>
           </button>
 
           <div className="admin-profile">
@@ -171,15 +172,15 @@ function ProtectedLayout() {
 
             <div className="admin-info">
               <strong>Admin</strong>
-              <span>Administrator</span>
+              <span>{t('administrator')}</span>
             </div>
 
             <button
               className="logout-button"
-              title="Log out"
+              title={t('logout')}
               onClick={handleLogout}
             >
-              Logout
+              {t('logout')}
             </button>
 
           </div>

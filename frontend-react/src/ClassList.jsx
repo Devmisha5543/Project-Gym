@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CalendarDays,
   Clock3,
@@ -14,6 +15,7 @@ import { API_URL } from './config'
 import { authFetch } from './authFetch'
 
 function ClassList({ classes, onClassUpdated, onClassDeleted }) {
+  const { t } = useTranslation(['classes', 'common'])
   const [editingClass, setEditingClass] = useState(null)
 
   const [branches, setBranches] = useState([])
@@ -38,7 +40,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
         if (!response.ok) throw new Error('Failed to load branches')
         return response.json()
       })
-      .then(data => setBranches(data))
+      .then(data => setBranches(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load branches:', error)
       })
@@ -48,7 +50,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
         if (!response.ok) throw new Error('Failed to load trainers')
         return response.json()
       })
-      .then(data => setTrainers(data))
+      .then(data => setTrainers(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load trainers:', error)
       })
@@ -123,7 +125,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Failed to update class.')
+        if (!response.ok) throw new Error(data.error || t('classUpdateFailed'))
         return data
       })
       .then(() => {
@@ -132,7 +134,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update class:', error)
-        setOperationError(error.message || 'Unable to update class. Please try again.')
+        setOperationError(error.message || t('classUpdateFailed'))
       })
       .finally(() => {
         setSaving(false)
@@ -141,7 +143,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
   function handleDelete(classId) {
     const confirmed = window.confirm(
-      'Are you sure you want to delete this class?'
+      t('deleteClassConfirm')
     )
 
     if (!confirmed) return
@@ -154,7 +156,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
     })
       .then(async response => {
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Failed to delete class.')
+        if (!response.ok) throw new Error(data.error || t('classDeleteFailed'))
         return data
       })
       .then(() => {
@@ -162,7 +164,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .catch(error => {
         console.error('Failed to delete class:', error)
-        setOperationError(error.message || 'Unable to delete class. Please try again.')
+        setOperationError(error.message || t('classDeleteFailed'))
       })
       .finally(() => {
         setDeletingId(null)
@@ -176,8 +178,8 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
           <CalendarDays size={25} />
         </div>
 
-        <h3>No classes scheduled</h3>
-        <p>Create your first class above to build the schedule.</p>
+        <h3>{t('noClasses')}</h3>
+        <p>{t('noClassesDescription')}</p>
       </div>
     )
   }
@@ -201,7 +203,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
               <div className="class-card-title-row">
                 <div>
                   <span className="class-card-label">
-                    Class #{gymClass.class_id}
+                    {t('classCardLabel', { id: gymClass.class_id })}
                   </span>
 
                   <h2>{gymClass.class_name}</h2>
@@ -216,22 +218,22 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
                 <span>
                   <Clock3 size={15} />
-                  {gymClass.duration_minutes} minutes
+                  {t('minutesCount', { count: gymClass.duration_minutes })}
                 </span>
 
                 <span>
                   <Users size={15} />
-                  Capacity {gymClass.capacity}
+                  {t('capacityCount', { count: gymClass.capacity })}
                 </span>
 
                 <span>
                   <Users size={15} />
-                  Trainer #{gymClass.trainer_id}
+                  {t('trainerItem', { id: gymClass.trainer_id })}
                 </span>
 
                 <span>
                   <MapPin size={15} />
-                  Branch #{gymClass.branch_id}
+                  {t('branchItem', { id: gymClass.branch_id })}
                 </span>
               </div>
 
@@ -242,7 +244,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                   onClick={() => handleEdit(gymClass)}
                 >
                   <Pencil size={15} />
-                  Edit
+                  {t('edit', { ns: 'common' })}
                 </button>
 
                 <button
@@ -254,8 +256,8 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                   <Trash2 size={15} />
 
                   {deletingId === gymClass.class_id
-                    ? 'Deleting...'
-                    : 'Delete'}
+                    ? t('deleting', { ns: 'common' })
+                    : t('delete', { ns: 'common' })}
                 </button>
               </div>
             </div>
@@ -269,10 +271,10 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
             <div className="class-edit-header">
               <div>
                 <span className="class-card-label">
-                  EDITING CLASS #{editingClass.class_id}
+                  {t('editingClass', { id: editingClass.class_id })}
                 </span>
 
-                <h2>Edit Class</h2>
+                <h2>{t('editClass')}</h2>
               </div>
 
               <button
@@ -287,7 +289,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
             <form onSubmit={handleUpdate}>
               <div className="class-edit-grid">
                 <label className="class-field">
-                  <span>Class name</span>
+                  <span>{t('className')}</span>
 
                   <div className="class-input-wrap">
                     <Dumbbell size={16} />
@@ -303,7 +305,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 </label>
 
                 <label className="class-field">
-                  <span>Branch</span>
+                  <span>{t('branch', { ns: 'common' })}</span>
 
                   <div className="class-input-wrap">
                     <MapPin size={16} />
@@ -314,7 +316,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                       onChange={handleChange}
                       required
                     >
-                      <option value="">Select a branch</option>
+                      <option value="">{t('selectBranch', { ns: 'common' })}</option>
 
                       {branches.map(branch => (
                         <option
@@ -329,7 +331,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 </label>
 
                 <label className="class-field">
-                  <span>Trainer</span>
+                  <span>{t('trainer', { ns: 'common' })}</span>
 
                   <div className="class-input-wrap">
                     <Users size={16} />
@@ -340,7 +342,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                       onChange={handleChange}
                       required
                     >
-                      <option value="">Select a trainer</option>
+                      <option value="">{t('selectTrainer', { ns: 'common' })}</option>
 
                       {trainers.map(trainer => (
                         <option
@@ -355,7 +357,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 </label>
 
                 <label className="class-field">
-                  <span>Schedule time</span>
+                  <span>{t('scheduleTime')}</span>
 
                   <div className="class-input-wrap">
                     <CalendarDays size={16} />
@@ -371,7 +373,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 </label>
 
                 <label className="class-field">
-                  <span>Duration in minutes</span>
+                  <span>{t('durationMinutes')}</span>
 
                   <div className="class-input-wrap">
                     <Clock3 size={16} />
@@ -387,7 +389,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 </label>
 
                 <label className="class-field">
-                  <span>Capacity</span>
+                  <span>{t('capacity')}</span>
 
                   <div className="class-input-wrap">
                     <Users size={16} />
@@ -411,7 +413,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                   disabled={saving}
                 >
                   <X size={15} />
-                  Cancel
+                  {t('cancel', { ns: 'common' })}
                 </button>
 
                 <button
@@ -421,7 +423,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
                 >
                   <Save size={15} />
 
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saving ? t('saving', { ns: 'common' }) : t('saveChanges', { ns: 'common' })}
                 </button>
               </div>
             </form>

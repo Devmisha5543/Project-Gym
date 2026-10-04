@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { adminSchema } from './schemas'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
@@ -13,6 +14,7 @@ import {
 import FeedbackMessage from './FeedbackMessage'
 
 function AdminForm({ onAdminCreated }) {
+  const { t } = useTranslation(['admin', 'common'])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -67,7 +69,7 @@ function AdminForm({ onAdminCreated }) {
         const data = await response.json()
 
         if (!response.ok) {
-          throw new Error(data.error || 'Failed to create admin')
+          throw new Error(data.error || t('adminCreateFailed'))
         }
 
         return data
@@ -78,11 +80,11 @@ function AdminForm({ onAdminCreated }) {
         setPhone('')
         setPassword('')
         onAdminCreated()
-        setSuccessMessage('Administrator created successfully.')
+        setSuccessMessage(t('adminCreated'))
       })
       .catch(error => {
         console.error('Failed to create admin:', error)
-        setSubmitError(error.message)
+        setSubmitError(error.message || t('adminCreateFailed'))
       })
       .finally(() => {
         setSaving(false)
@@ -97,8 +99,8 @@ function AdminForm({ onAdminCreated }) {
         </div>
 
         <div>
-          <h2>Add Administrator</h2>
-          <p>Create an admin account with secure credentials.</p>
+          <h2>{t('addAdmin')}</h2>
+          <p>{t('addAdminDescription')}</p>
         </div>
       </div>
 
@@ -106,7 +108,7 @@ function AdminForm({ onAdminCreated }) {
         <div className="admin-form-grid">
 
           <label className="admin-field">
-            <span>Name</span>
+            <span>{t('name')}</span>
 
             <div className="admin-input-wrap">
               <UserRound size={16} />
@@ -116,7 +118,7 @@ function AdminForm({ onAdminCreated }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
-                placeholder="Full name"
+                placeholder={t('fullName')}
               />
             </div>
 
@@ -128,7 +130,7 @@ function AdminForm({ onAdminCreated }) {
           </label>
 
           <label className="admin-field">
-            <span>Email</span>
+            <span>{t('email')}</span>
 
             <div className="admin-input-wrap">
               <Mail size={16} />
@@ -138,7 +140,7 @@ function AdminForm({ onAdminCreated }) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                placeholder="admin@example.com"
+                placeholder={t('emailPlaceholder')}
               />
             </div>
 
@@ -150,7 +152,7 @@ function AdminForm({ onAdminCreated }) {
           </label>
 
           <label className="admin-field">
-            <span>Phone</span>
+            <span>{t('phone')}</span>
 
             <div className="admin-input-wrap">
               <Phone size={16} />
@@ -160,7 +162,7 @@ function AdminForm({ onAdminCreated }) {
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 required
-                placeholder="Phone number"
+                placeholder={t('phonePlaceholder')}
               />
             </div>
 
@@ -172,7 +174,7 @@ function AdminForm({ onAdminCreated }) {
           </label>
 
           <label className="admin-field">
-            <span>Password</span>
+            <span>{t('password')}</span>
 
             <div className="admin-input-wrap">
               <KeyRound size={16} />
@@ -182,7 +184,7 @@ function AdminForm({ onAdminCreated }) {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                placeholder="Temporary password"
+                placeholder={t('temporaryPassword')}
               />
             </div>
 
@@ -211,7 +213,7 @@ function AdminForm({ onAdminCreated }) {
           >
             <Save size={16} />
 
-            {saving ? 'Creating...' : 'Add Admin'}
+            {saving ? t('creating') : t('addAdmin')}
           </button>
         </div>
       </form>

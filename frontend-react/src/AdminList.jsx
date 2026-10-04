@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   KeyRound,
   Mail,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 
 function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
+  const { t } = useTranslation(['admin', 'common'])
   const [editingId, setEditingId] = useState(null)
 
   const [name, setName] = useState('')
@@ -60,11 +62,9 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
           <ShieldCheck size={25} />
         </div>
 
-        <h3>No admin records</h3>
+        <h3>{t('noAdmins')}</h3>
 
-        <p>
-          Create an administrator above to manage access.
-        </p>
+        <p>{t('noAdminsDescription')}</p>
       </div>
     )
   }
@@ -85,7 +85,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
               <div className="admin-edit-grid">
 
                 <label className="admin-field">
-                  <span>Name</span>
+                  <span>{t('name')}</span>
 
                   <div className="admin-input-wrap">
                     <UserRound size={15} />
@@ -98,7 +98,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                 </label>
 
                 <label className="admin-field">
-                  <span>Email</span>
+                  <span>{t('email')}</span>
 
                   <div className="admin-input-wrap">
                     <Mail size={15} />
@@ -112,7 +112,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                 </label>
 
                 <label className="admin-field">
-                  <span>Phone</span>
+                  <span>{t('phone')}</span>
 
                   <div className="admin-input-wrap">
                     <Phone size={15} />
@@ -125,7 +125,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                 </label>
 
                 <label className="admin-field">
-                  <span>New password</span>
+                  <span>{t('newPassword')}</span>
 
                   <div className="admin-input-wrap">
                     <KeyRound size={15} />
@@ -134,7 +134,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                       type="password"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="Leave empty to keep current"
+                      placeholder={t('keepPasswordEmpty')}
                     />
                   </div>
                 </label>
@@ -149,7 +149,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                   onClick={() => handleUpdate(admin.admin_id)}
                 >
                   <Save size={15} />
-                  Save Changes
+                  {t('saveChanges', { ns: 'common' })}
                 </button>
 
                 <button
@@ -158,7 +158,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                   onClick={cancelEditing}
                 >
                   <X size={15} />
-                  Cancel
+                  {t('cancel', { ns: 'common' })}
                 </button>
 
               </div>
@@ -172,7 +172,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
               <div className="admin-card-title-row">
                 <div>
                   <span className="admin-card-label">
-                    Administrator #{admin.admin_id}
+                    {t('adminCardLabel', { id: admin.admin_id })}
                   </span>
 
                   <h2>{admin.name}</h2>
@@ -181,7 +181,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                 {admin.admin_id === 1 && (
                   <span className="admin-super-badge">
                     <ShieldCheck size={13} />
-                    Super Admin
+                    {t('superAdmin')}
                   </span>
                 )}
               </div>
@@ -206,7 +206,7 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                   onClick={() => startEditing(admin)}
                 >
                   <Pencil size={15} />
-                  Edit
+                  {t('edit', { ns: 'common' })}
                 </button>
 
                 {admin.admin_id !== 1 && (
@@ -216,9 +216,9 @@ function AdminList({ admins, onAdminUpdated, onAdminDeleted }) {
                     onClick={() => onAdminDeleted(admin.admin_id)}
                   >
                     <Trash2 size={15} />
-                    Delete
-                    </button>
-)}
+                    {t('delete', { ns: 'common' })}
+                  </button>
+                )}
                   
               </div>
 
