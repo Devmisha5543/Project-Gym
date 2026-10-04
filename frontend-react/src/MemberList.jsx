@@ -4,7 +4,7 @@ import { API_URL } from './config'
 import MemberDetail from './MemberDetail'
 import MemberPhoto from './MemberPhoto'
 
-function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFeedback }) {
+function MemberList({ members, memberships = [], branches, onMemberUpdated, onMemberDeleted, onFeedback, onRenew }) {
   const [selectedMember, setSelectedMember] = useState(null)
 
   if (members.length === 0) {
@@ -123,7 +123,16 @@ function MemberList({ members, branches, onMemberUpdated, onMemberDeleted, onFee
           <div className="member-detail-modal-panel">
             <MemberDetail
               member={selectedMember}
+              membership={memberships
+                .filter(item => String(item.member_id) === String(selectedMember.member_id))
+                .sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')) || Number(b.membership_id) - Number(a.membership_id))[0]}
               branches={branches}
+              onRenew={() => {
+                const membership = memberships
+                  .filter(item => String(item.member_id) === String(selectedMember.member_id))
+                  .sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')) || Number(b.membership_id) - Number(a.membership_id))[0]
+                if (membership) onRenew?.(membership)
+              }}
               onMemberUpdated={updated => {
                 setSelectedMember(updated)
                 onMemberUpdated?.(updated)

@@ -8,11 +8,15 @@ from flask import send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import datetime
+import hashlib
+import secrets
 from functools import wraps
 from flask import request
 import redis
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
+from email_service import send_password_changed_email, send_reset_email
 
 load_dotenv()
 
@@ -41,7 +45,6 @@ def invalidate_analytics_cache():
         redis_client.incr(f"analytics:version:{gym_id}")
     except redis.RedisError:
         app.logger.warning("Analytics cache version could not be updated")
-
 
 def cache_response(cache_key):
     def decorator(f):
@@ -123,6 +126,9 @@ def get_db_connection():
         )
 
 app = Flask(__name__)
+_password_reset_executor = ThreadPoolExecutor(max_workers=2)
+_PASSWORD_RESET_RATE_LIMIT = 3
+_PASSWORD_RESET_RATE_WINDOW = 60 * 60
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -152,10 +158,206 @@ def token_required(f):
         except jwt.InvalidTokenError:
             return jsonify({"error": "Invalid token"}), 401
 
+        admin_id = decoded.get("admin_id")
+        if admin_id is not None:
+            conn = None
+            cursor = None
+            try:
+                cache_key = f"auth:revoked_at:{admin_id}"
+                revoked_at = None
+                try:
+                    cached_revocation = redis_client.get(cache_key)
+                    if cached_revocation is not None:
+                        revoked_at = (
+                            datetime.datetime.fromisoformat(cached_revocation)
+                            if cached_revocation != "none" else False
+                        )
+                except (redis.RedisError, ValueError):
+                    pass
+
+                if revoked_at is None:
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT MAX(used_at) FROM password_reset_tokens WHERE user_id = %s AND used_at IS NOT NULL;",
+                        (admin_id,)
+                    )
+                    revoked_at = cursor.fetchone()[0] or False
+                    try:
+                        redis_client.setex(
+                            cache_key, 300,
+                            revoked_at.isoformat() if revoked_at else "none"
+                        )
+                    except redis.RedisError:
+                        pass
+
+                issued_at = decoded.get("iat")
+                if revoked_at and (
+                    issued_at is None or revoked_at >= datetime.datetime.fromtimestamp(
+                        issued_at, datetime.timezone.utc
+                    )
+                ):
+                    return jsonify({"error": "Invalid token"}), 401
+            except Exception:
+                app.logger.error("Authentication token revocation check failed")
+                return jsonify({"error": "Authentication service unavailable"}), 503
+            finally:
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
+
         request.decoded_token = decoded
         return f(*args, **kwargs)
 
     return decorated
+
+
+def _allow_password_reset_request(email, ip_address):
+    email_key = "email:" + hashlib.sha256(email.lower().encode("utf-8")).hexdigest()
+    ip_key = "ip:" + hashlib.sha256((ip_address or "unknown").encode("utf-8")).hexdigest()
+    rate_limit_script = """
+        local email_count = tonumber(redis.call('GET', KEYS[1]) or '0')
+        local ip_count = tonumber(redis.call('GET', KEYS[2]) or '0')
+        if email_count >= tonumber(ARGV[1]) or ip_count >= tonumber(ARGV[1]) then
+            return 0
+        end
+        if email_count == 0 then
+            redis.call('SET', KEYS[1], 1, 'EX', ARGV[2])
+        else
+            redis.call('INCR', KEYS[1])
+        end
+        if ip_count == 0 then
+            redis.call('SET', KEYS[2], 1, 'EX', ARGV[2])
+        else
+            redis.call('INCR', KEYS[2])
+        end
+        return 1
+    """
+    try:
+        return bool(redis_client.eval(
+            rate_limit_script, 2, "password-reset-rate:" + email_key,
+            "password-reset-rate:" + ip_key, _PASSWORD_RESET_RATE_LIMIT,
+            _PASSWORD_RESET_RATE_WINDOW
+        ))
+    except redis.RedisError:
+        app.logger.error("Password reset rate limiter unavailable")
+        return False
+
+
+def _process_password_reset_request(email):
+    conn = None
+    cursor = None
+    raw_token = None
+    recipient = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT admin_id, email FROM admin WHERE LOWER(email) = LOWER(%s) LIMIT 1 FOR UPDATE;", (email,))
+        user = cursor.fetchone()
+        if not user:
+            return
+
+        user_id, recipient = user
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        cursor.execute(
+            "UPDATE password_reset_tokens SET expires_at = CURRENT_TIMESTAMP WHERE user_id = %s AND used_at IS NULL;",
+            (user_id,)
+        )
+        cursor.execute(
+            "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (%s, %s, CURRENT_TIMESTAMP + INTERVAL '30 minutes');",
+            (user_id, token_hash)
+        )
+        conn.commit()
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.error("Password reset request processing failed")
+        return
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+    if recipient and raw_token:
+        try:
+            send_reset_email(recipient, raw_token)
+        except Exception:
+            app.logger.error("Password reset email delivery failed")
+
+
+def _send_password_changed_notification(email):
+    try:
+        send_password_changed_email(email)
+    except Exception:
+        app.logger.error("Password change confirmation email delivery failed")
+
+
+@app.route("/auth/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email")
+    if isinstance(email, str) and email.strip():
+        email = email.strip()
+        if _allow_password_reset_request(email, request.remote_addr):
+            _password_reset_executor.submit(_process_password_reset_request, email)
+    return jsonify({"message": "If that email is registered, a reset link has been sent."}), 200
+
+
+@app.route("/auth/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    raw_token = data.get("token")
+    new_password = data.get("new_password")
+    invalid_link = {"error": "Invalid or expired link."}
+    if not isinstance(raw_token, str) or not raw_token:
+        return jsonify(invalid_link), 400
+    if not isinstance(new_password, str) or len(new_password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters."}), 400
+
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT t.id, t.user_id, a.email FROM password_reset_tokens t JOIN admin a ON a.admin_id = t.user_id WHERE t.token_hash = %s AND t.used_at IS NULL AND t.expires_at > CURRENT_TIMESTAMP FOR UPDATE OF t, a;",
+            (token_hash,)
+        )
+        reset = cursor.fetchone()
+        if not reset:
+            conn.rollback()
+            return jsonify(invalid_link), 400
+
+        token_id, user_id, email = reset
+        password_hash = generate_password_hash(new_password)
+        cursor.execute("UPDATE admin SET password_hash = %s WHERE admin_id = %s;", (password_hash, user_id))
+        cursor.execute(
+            "UPDATE password_reset_tokens SET expires_at = CURRENT_TIMESTAMP WHERE user_id = %s AND id <> %s AND used_at IS NULL;",
+            (user_id, token_id)
+        )
+        cursor.execute("UPDATE password_reset_tokens SET used_at = CURRENT_TIMESTAMP WHERE id = %s;", (token_id,))
+        conn.commit()
+        try:
+            redis_client.delete(f"auth:revoked_at:{user_id}")
+        except redis.RedisError:
+            pass
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.error("Password reset transaction failed")
+        return jsonify({"error": "Password reset could not be completed."}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+    _password_reset_executor.submit(_send_password_changed_notification, email)
+    return jsonify({"message": "Your password has been reset."}), 200
 
 def super_admin_required(f):
     @wraps(f)
@@ -549,7 +751,9 @@ def create_member():
         "phone",
         "address",
         "join_date",
-        "wants_trainer"
+        "wants_trainer",
+        "plan_id",
+        "membership_end_date"
     ]
 
     missing = [field for field in required_fields if field not in data]
@@ -570,7 +774,7 @@ def create_member():
                     "error": "Upload a valid JPG, PNG, GIF, or WebP image."
                 }), 400
 
-            photo_filename = secure_filename(file.filename)
+            photo_filename = f"{secrets.token_hex(8)}_{secure_filename(file.filename)}"
             file.save(
                 os.path.join(
                     app.config["UPLOAD_FOLDER"],
@@ -578,35 +782,50 @@ def create_member():
                 )
             )
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT INTO Member
-        (branch_id, name, gender, phone, address, join_date,
-         wants_trainer, photo_filename)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING member_id;
-        """,
-        (
-            data["branch_id"],
-            data["name"],
-            data["gender"],
-            data["phone"],
-            data["address"],
-            data["join_date"],
-            data["wants_trainer"] == "true",
-            photo_filename
+    conn = cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO Member
+            (branch_id, name, gender, phone, address, join_date,
+             wants_trainer, photo_filename)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING member_id;
+            """,
+            (
+                data["branch_id"], data["name"], data["gender"],
+                data["phone"], data["address"], data["join_date"],
+                data["wants_trainer"] == "true", photo_filename
+            )
         )
-    )
-
-    new_id = cursor.fetchone()[0]
-
-    conn.commit()
-
-    cursor.close()
-    conn.close()
+        new_id = cursor.fetchone()[0]
+        cursor.execute(
+            """
+            INSERT INTO Membership (member_id, plan_id, start_date, end_date, status)
+            VALUES (%s, %s, %s, %s, 'active')
+            RETURNING membership_id;
+            """,
+            (new_id, data["plan_id"], data["join_date"], data["membership_end_date"])
+        )
+        membership_id = cursor.fetchone()[0]
+        conn.commit()
+    except Exception:
+        if conn:
+            conn.rollback()
+        if photo_filename:
+            try:
+                os.remove(os.path.join(app.config["UPLOAD_FOLDER"], photo_filename))
+            except OSError:
+                pass
+        app.logger.exception("Failed to create member and initial membership")
+        return jsonify({"error": "Failed to create member and initial membership."}), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
     # Invalidate cached member list after successful creation
     invalidate_members_cache()
@@ -615,7 +834,8 @@ def create_member():
 
     return jsonify({
         "message": "Member created",
-        "member_id": new_id
+        "member_id": new_id,
+        "membership_id": membership_id
     }), 201
 
 
@@ -625,10 +845,16 @@ def delete_member(member_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute(
-        "DELETE FROM Member WHERE member_id = %s;",
-        (member_id,)
-    )
+    try:
+        cursor.execute(
+            "DELETE FROM Member WHERE member_id = %s;",
+            (member_id,)
+        )
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This member cannot be deleted while memberships, bookings, or assignments still reference them."}), 409
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -886,7 +1112,13 @@ def delete_trainer(trainer_id):
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("DELETE FROM Trainer WHERE trainer_id = %s;", (trainer_id,))
+    try:
+        cursor.execute("DELETE FROM Trainer WHERE trainer_id = %s;", (trainer_id,))
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This trainer cannot be deleted while classes, branch links, or assignments still reference them."}), 409
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -1030,7 +1262,13 @@ def delete_membership(membership_id):
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("DELETE FROM Membership WHERE membership_id = %s;", (membership_id,))
+    try:
+        cursor.execute("DELETE FROM Membership WHERE membership_id = %s;", (membership_id,))
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This membership cannot be deleted while payments still reference it."}), 409
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -1179,7 +1417,7 @@ def get_class_bookings():
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("SELECT booking_id, member_id, class_id, booking_date, status FROM classbooking;")
+    cursor.execute("SELECT booking_id, member_id, class_id, booking_date, cancel_date, status FROM classbooking;")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -1205,7 +1443,7 @@ def create_class_booking():
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    required_fields = ["member_id", "class_id", "booking_date", "cancel_date", "status"]
+    required_fields = ["member_id", "class_id", "booking_date", "status"]
     missing = [field for field in required_fields if field not in data]
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
@@ -1256,7 +1494,7 @@ def update_class_booking(booking_id):
 
     cursor=conn.cursor()
     cursor.execute("UPDATE ClassBooking SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s WHERE booking_id = %s;",
-                   (data["member_id"], data["class_id"], data["booking_date"], data["cancel_date"], data["status"], booking_id))
+                   (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"], booking_id))
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -1329,7 +1567,13 @@ def delete_class(class_id):
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("DELETE FROM Class WHERE class_id = %s;", (class_id,))
+    try:
+        cursor.execute("DELETE FROM Class WHERE class_id = %s;", (class_id,))
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This class cannot be deleted while bookings still reference it."}), 409
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -1621,15 +1865,62 @@ def create_trainer_branch():
     conn=get_db_connection()
 
     cursor=conn.cursor()
-    cursor.execute("INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
-                   (data["trainer_id"],data["branch_id"])
-    )
+    try:
+        cursor.execute("INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
+                       (data["trainer_id"],data["branch_id"]))
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This trainer is already linked to that branch."}), 409
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Select an existing trainer and branch."}), 404
     conn.commit()
     invalidate_trainer_branches_cache()
     cursor.close()
     conn.close()
 
     return jsonify({"message": "Trainer-Branch relationship created"}), 201
+
+@app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["PUT"])
+@token_required
+def update_trainer_branch(trainer_id, branch_id):
+    data = request.get_json(silent=True) or {}
+    if not data.get("trainer_id") or not data.get("branch_id"):
+        return jsonify({"error": "Both trainer_id and branch_id are required."}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "UPDATE TrainerBranch SET trainer_id = %s, branch_id = %s WHERE trainer_id = %s AND branch_id = %s;",
+            (data["trainer_id"], data["branch_id"], trainer_id, branch_id)
+        )
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This trainer is already linked to that branch."}), 409
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Select an existing trainer and branch."}), 404
+
+    if cursor.rowcount == 0:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "Trainer branch link not found."}), 404
+
+    conn.commit()
+    invalidate_trainer_branches_cache()
+    cursor.close()
+    conn.close()
+    return jsonify({"message": "Trainer-Branch relationship updated"}), 200
 
 @app.route("/trainerbranch/<int:trainer_id>/<int:branch_id>", methods=["DELETE"])
 @token_required
@@ -2166,6 +2457,7 @@ def analytics_branches():
     cursor.close()
     conn.close()
     return jsonify({"branches": branches, "unavailable_reason": "Branch renewal and retention rates require membership lifecycle history, which is not stored. Revenue is attributed using each member's current branch because payments do not store a branch at payment time."})
+
 @app.route("/membershipplans", methods=["POST"])
 @token_required
 def create_membership_plan():
@@ -2199,7 +2491,13 @@ def create_membership_plan():
 def delete_membership_plan(plan_id):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM MembershipPlan WHERE plan_id = %s;", (plan_id,))
+    try:
+        cursor.execute("DELETE FROM MembershipPlan WHERE plan_id = %s;", (plan_id,))
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        cursor.close()
+        conn.close()
+        return jsonify({"error": "This plan cannot be deleted while memberships still use it."}), 409
 
     if cursor.rowcount == 0:
         conn.rollback()
@@ -2500,12 +2798,14 @@ def login():
     if not check_password_hash(password_hash, data["password"]):
         return jsonify({"error": "Invalid email or password"}), 401
 
+    issued_at = datetime.datetime.now(datetime.timezone.utc)
     token = jwt.encode(
         {
             "admin_id": admin_id,
             "role": "admin",
             "gym_id": gym_id,
-            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)
+            "iat": issued_at.timestamp(),
+            "exp": issued_at + datetime.timedelta(hours=8)
         },
         os.getenv("JWT_SECRET"),
         algorithm="HS256"

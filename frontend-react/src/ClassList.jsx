@@ -34,14 +34,20 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
   useEffect(() => {
     authFetch(`${API_URL}/branches`)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to load branches')
+        return response.json()
+      })
       .then(data => setBranches(data))
       .catch(error => {
         console.error('Failed to load branches:', error)
       })
 
     authFetch(`${API_URL}/trainers`)
-      .then(response => response.json())
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to load trainers')
+        return response.json()
+      })
       .then(data => setTrainers(data))
       .catch(error => {
         console.error('Failed to load trainers:', error)
@@ -115,12 +121,10 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       },
       body: JSON.stringify(formData)
     })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to update class')
-        }
-
-        return response.json()
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Failed to update class.')
+        return data
       })
       .then(() => {
         cancelEdit()
@@ -128,7 +132,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update class:', error)
-        setOperationError('Unable to update class. Please try again.')
+        setOperationError(error.message || 'Unable to update class. Please try again.')
       })
       .finally(() => {
         setSaving(false)
@@ -148,19 +152,17 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
     authFetch(`${API_URL}/classes/${classId}`, {
       method: 'DELETE'
     })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to delete class')
-        }
-
-        return response.json()
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Failed to delete class.')
+        return data
       })
       .then(() => {
         onClassDeleted()
       })
       .catch(error => {
         console.error('Failed to delete class:', error)
-        setOperationError('Unable to delete class. Please try again.')
+        setOperationError(error.message || 'Unable to delete class. Please try again.')
       })
       .finally(() => {
         setDeletingId(null)

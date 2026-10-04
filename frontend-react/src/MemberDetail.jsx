@@ -276,6 +276,7 @@ function MembershipDetails({ membership }) {
 
   return (
     <div className="membership-detail-block">
+      <div><CreditCard size={15} /><span>Membership plan<strong>{membership.plan_name || 'Not provided'}</strong></span></div>
       <div><CalendarDays size={15} /><span>Membership start<strong>{membership.start_date || 'Not provided'}</strong></span></div>
       <div><CalendarDays size={15} /><span>Membership expiration<strong>{membership.end_date || 'Not provided'}</strong></span></div>
       <div><UserRoundCheck size={15} /><span>Membership status<strong>{remainingDays < 0 ? 'Expired' : membership.status || 'Not provided'}</strong></span></div>

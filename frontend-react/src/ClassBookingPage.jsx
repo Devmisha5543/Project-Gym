@@ -40,7 +40,7 @@ function ClassBookingPage() {
       </div>
       <ClassBookingForm onClassBookingCreated={loadClassBookings} />
       {pageError && <div className="class-booking-feedback"><Receipt size={17} /><span>{pageError}</span></div>}
-      {loading ? <div className="class-booking-state"><div className="loading-spinner"></div><h3>Loading bookings</h3><p>Getting reservations ready.</p></div> : <ClassBookingList classBookings={classBookings} />}
+      {loading ? <div className="class-booking-state"><div className="loading-spinner"></div><h3>Loading bookings</h3><p>Getting reservations ready.</p></div> : <ClassBookingList classBookings={classBookings} onClassBookingUpdated={loadClassBookings} onClassBookingDeleted={loadClassBookings} />}
     </div>
   )
 }

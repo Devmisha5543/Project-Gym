@@ -1,15 +1,15 @@
 import { z } from 'zod'
 
+const phoneSchema = z.string().refine(value => {
+  const digits = value.replace(/\D/g, '')
+  return /^[\d\s()+-]+$/.test(value) && digits.length >= 7 && digits.length <= 15
+}, "Phone number must contain 7 to 15 digits")
+
 export const memberSchema = z.object({
   name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
+    .min(2, "Name must be at least 2 characters"),
 
-  phone: z.string()
-    .refine(value => {
-      const digits = value.replace(/\D/g, '')
-      return /^[\d\s()+-]+$/.test(value) && digits.length >= 7 && digits.length <= 15
-    }, "Phone number must contain 7 to 15 digits"),
+  phone: phoneSchema,
 
   email: z.string()
     .email("Must be a valid email address")
@@ -19,24 +19,21 @@ export const memberSchema = z.object({
 
 export const branchSchema = z.object({
   name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
-  phone: z.string().regex(/^\d{7,15}$/, "Phone number must be 7 to 15 digits, no letters or symbols")
+    .min(2, "Name must be at least 2 characters"),
+  phone: phoneSchema
 })
 
 export const trainerSchema = z.object({
   name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
-  phone: z.string().regex(/^\d{7,15}$/, "Phone number must be 7 to 15 digits, no letters or symbols"),
+    .min(2, "Name must be at least 2 characters"),
+  phone: phoneSchema,
   email: z.string().email("Must be a valid email address"),
   certification: z.string().min(2, "Certification must be at least 2 characters")
 })
 
 export const membershipPlanSchema = z.object({
   planName: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
+    .min(2, "Name must be at least 2 characters"),
   price: z.coerce.number().positive("Price must be greater than 0")
 })
 
@@ -57,8 +54,7 @@ export const classSchema = z.object({
   branchId: z.string().min(1, "This field is required"),
   trainerId: z.string().min(1, "This field is required"),
   className: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
+    .min(2, "Name must be at least 2 characters"),
   scheduleTime: z.string().min(1, "Date is required"),
   durationMinutes: z.coerce.number().int().positive("Duration must be a positive whole number"),
   capacity: z.coerce.number().int().positive("Capacity must be a positive whole number")
@@ -79,9 +75,8 @@ export const paymentSchema = z.object({
 export const equipmentSchema = z.object({
   branchId: z.string().min(1, "This field is required"),
   name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
-  quantity: z.coerce.number().int().positive("Quantity must be a positive whole number")
+    .min(2, "Name must be at least 2 characters"),
+  quantity: z.coerce.number().int().nonnegative("Quantity must be zero or a positive whole number")
 })
 
 export const trainerBranchSchema = z.object({
@@ -91,17 +86,12 @@ export const trainerBranchSchema = z.object({
 
 export const adminSchema = z.object({
   name: z.string()
-    .min(2, "Name must be at least 2 characters")
-    .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces"),
+    .min(2, "Name must be at least 2 characters"),
 
   email: z.string()
     .email("Must be a valid email address"),
 
-  phone: z.string()
-    .regex(
-      /^\d{7,15}$/,
-      "Phone number must be 7 to 15 digits, no letters or symbols"
-    ),
+  phone: phoneSchema,
 
   password: z.string()
     .min(6, "Password must be at least 6 characters")

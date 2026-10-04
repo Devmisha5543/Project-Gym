@@ -27,10 +27,14 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   useEffect(() => {
     authFetch(`${API_URL}/memberships`)
-      .then(response => response.json())
-      .then(data => setMemberships(data))
+      .then(response => {
+        if (!response.ok) throw new Error(`Memberships request failed: ${response.status}`)
+        return response.json()
+      })
+      .then(data => setMemberships(Array.isArray(data) ? data : []))
       .catch(error => {
         console.error('Failed to load memberships:', error)
+        setOperationError('Unable to load memberships needed to edit payments.')
       })
   }, [])
 
@@ -84,12 +88,10 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       },
       body: JSON.stringify(updatedPayment)
     })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to update payment')
-        }
-
-        return response.json()
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Failed to update payment.')
+        return data
       })
       .then(() => {
         cancelEditing()
@@ -97,7 +99,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .catch(error => {
         console.error('Failed to update payment:', error)
-        setOperationError('Unable to update payment. Please try again.')
+        setOperationError(error.message || 'Unable to update payment. Please try again.')
       })
       .finally(() => {
         setSaving(false)
@@ -117,19 +119,17 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
     authFetch(`${API_URL}/payments/${paymentId}`, {
       method: 'DELETE'
     })
-      .then(response => {
-        if (!response.ok) {
-          throw new Error('Failed to delete payment')
-        }
-
-        return response.json()
+      .then(async response => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Failed to delete payment.')
+        return data
       })
       .then(() => {
         onPaymentDeleted()
       })
       .catch(error => {
         console.error('Failed to delete payment:', error)
-        setOperationError('Unable to delete payment. Please try again.')
+        setOperationError(error.message || 'Unable to delete payment. Please try again.')
       })
       .finally(() => {
         setDeletingId(null)

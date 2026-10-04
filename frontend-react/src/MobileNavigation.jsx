@@ -9,7 +9,6 @@ import {
   MoreHorizontal,
   X,
   CreditCard,
-  UserCheck,
   Calendar,
   CalendarCheck,
   Receipt,
@@ -35,7 +34,6 @@ const primaryNav = [
 
 const moreRoutes = [
   { path: '/membershipplans', label: 'Membership Plans', icon: CreditCard },
-  { path: '/memberships', label: 'Memberships', icon: UserCheck },
   {
     path: '/personaltrainingassignments',
     label: 'Personal Training',

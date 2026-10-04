@@ -285,10 +285,10 @@ function DashboardPage() {
           </div>
 
           <a
-            href="/memberships"
+            href="/members"
             className="view-all"
           >
-            View memberships →
+            View members →
           </a>
 
         </div>

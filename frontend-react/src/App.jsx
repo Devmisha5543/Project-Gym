@@ -14,7 +14,6 @@ import BranchPage from './BranchPage'
 import TrainerPage from './TrainerPage'
 import MembershipPlanPage from './MembershipPlanPage'
 import AnalyticsPage from './AnalyticsPage'
-import MembershipPage from './MembershipPage'
 import PersonalTrainingAssignmentPage from './PersonalTrainingAssignmentPage'
 import ClassPage from './ClassPage'
 import ClassBookingPage from './ClassBookingPage'
@@ -24,6 +23,8 @@ import TrainerBranchPage from './TrainerBranchPage'
 import AdminPage from './AdminPage'
 import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
+import ForgotPassword from './ForgotPassword'
+import ResetPassword from './ResetPassword'
 import MobileNavigation from './MobileNavigation'
 import SettingsPage from './SettingsPage'
 import { GymProvider, useGym, GymBrandMark } from './GymContext'
@@ -46,7 +47,6 @@ const navigation = [
     title: 'Management',
     items: [
       { path: '/membershipplans', label: 'Membership Plans' },
-      { path: '/memberships', label: 'Memberships' },
       {
         path: '/personaltrainingassignments',
         label: 'PT Assignments',
@@ -239,6 +239,9 @@ function App() {
         element={<LoginRoute />}
       />
 
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
 
       {/* PROTECTED ROUTES */}
       <Route
@@ -272,10 +275,6 @@ function App() {
           element={<MembershipPlanPage />}
         />
 
-        <Route
-          path="/memberships"
-          element={<MembershipPage />}
-        />
 
         <Route
           path="/personaltrainingassignments"

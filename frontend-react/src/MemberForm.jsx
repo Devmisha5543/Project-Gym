@@ -198,6 +198,8 @@ function MemberForm({ onMemberCreated }) {
       formData.append('address', address)
       formData.append('join_date', joinDate)
       formData.append('wants_trainer', wantsTrainer)
+      formData.append('plan_id', planId)
+      formData.append('membership_end_date', calculateMembershipEndDate(joinDate))
 
       if (photo) {
         formData.append('photo', photo)
@@ -220,62 +222,6 @@ function MemberForm({ onMemberCreated }) {
         )
       }
 
-      /*
-       * The backend returns the newly-created member_id.
-       */
-      const newMemberId = memberData.member_id
-
-      if (!newMemberId) {
-        throw new Error(
-          'Member was created but no member ID was returned.'
-        )
-      }
-
-      /*
-       * STEP 2
-       * Create the initial membership for the new member.
-       *
-       * Memberships currently require:
-       * member_id
-       * plan_id
-       * start_date
-       * end_date
-       * status
-       *
-       * For initial registration we use a 30-day membership.
-       */
-      const endDate = calculateMembershipEndDate(joinDate)
-
-      const membershipResponse = await authFetch(
-        `${API_URL}/memberships`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            member_id: Number(newMemberId),
-            plan_id: Number(planId),
-            start_date: joinDate,
-            end_date: endDate,
-            status: 'active'
-          })
-        }
-      )
-
-      const membershipData =
-        await membershipResponse.json()
-
-      if (!membershipResponse.ok) {
-        throw new Error(
-          membershipData.error ||
-          'Member was created, but the membership could not be created.'
-        )
-      }
-
-      /*
-       * Both records now exist successfully.
-       */
       resetForm()
 
       if (onMemberCreated) {

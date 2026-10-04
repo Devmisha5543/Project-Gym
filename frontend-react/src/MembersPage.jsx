@@ -1,6 +1,7 @@
 import { authFetch } from './authFetch'
 import { useState, useEffect, useSyncExternalStore } from 'react'
 import { API_URL } from './config'
+import { useNavigate } from 'react-router-dom'
 import MemberList from './MemberList'
 import MemberForm from './MemberForm'
 import { Search, Users, Building2, Filter, X, AlertCircle, RotateCcw } from 'lucide-react'
@@ -21,12 +22,14 @@ function getMobileServerSnapshot() {
 }
 
 function MembersPage() {
+  const navigate = useNavigate()
   const isMobile = useSyncExternalStore(
     subscribeToMobile,
     getMobileSnapshot,
     getMobileServerSnapshot
   )
   const [members, setMembers] = useState([])
+  const [memberships, setMemberships] = useState([])
   const [branches, setBranches] = useState([])
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('')
@@ -83,31 +86,28 @@ function MembersPage() {
     setLoading(true)
     setPageError('')
 
-    authFetch(`${API_URL}/members`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`Members request failed: ${response.status}`)
-        }
-
+    Promise.all([
+      authFetch(`${API_URL}/members`).then(response => {
+        if (!response.ok) throw new Error(`Members request failed: ${response.status}`)
+        return response.json()
+      }),
+      authFetch(`${API_URL}/memberships`).then(response => {
+        if (!response.ok) throw new Error(`Memberships request failed: ${response.status}`)
         return response.json()
       })
-      .then(data => {
-        console.log('Members API response:', data)
-
-        if (Array.isArray(data)) {
-          setMembers(data)
-        } else if (Array.isArray(data.members)) {
-          setMembers(data.members)
-        } else {
-          console.error('Expected members array but received:', data)
-          setMembers([])
-          setPageError('Unable to load members data.')
+    ])
+      .then(([memberData, membershipData]) => {
+        const memberRows = Array.isArray(memberData) ? memberData : memberData.members
+        const membershipRows = Array.isArray(membershipData) ? membershipData : membershipData.memberships
+        if (!Array.isArray(memberRows) || !Array.isArray(membershipRows)) {
+          throw new Error('Unexpected members or memberships response.')
         }
+        setMembers(memberRows)
+        setMemberships(membershipRows)
       })
       .catch(error => {
-        console.error('Failed to load members:', error)
-        setMembers([])
-        setPageError('Unable to load members. Please try again.')
+        console.error('Failed to load members and memberships:', error)
+        setPageError('Unable to load members and membership details. Please try again.')
       })
       .finally(() => {
         setLoading(false)
@@ -471,10 +471,12 @@ function MembersPage() {
 
         <MemberList
           members={filteredMembers}
+          memberships={memberships}
           branches={branches}
           onMemberUpdated={handleMemberUpdated}
           onMemberDeleted={handleMemberDeleted}
           onFeedback={(message, type) => setMemberFeedback({ message, type })}
+          onRenew={membership => navigate('/payments', { state: { renewalMembershipId: membership.membership_id } })}
         />
 
       )}

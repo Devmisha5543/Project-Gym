@@ -70,7 +70,11 @@ function PersonalTrainingAssignmentPage() {
           <p>Getting your coaching schedule ready.</p>
         </div>
       ) : (
-        <PersonalTrainingAssignmentList personalTrainingAssignments={personalTrainingAssignments} />
+        <PersonalTrainingAssignmentList
+          personalTrainingAssignments={personalTrainingAssignments}
+          onAssignmentUpdated={loadPersonalTrainingAssignments}
+          onAssignmentDeleted={loadPersonalTrainingAssignments}
+        />
       )}
     </div>
   )
