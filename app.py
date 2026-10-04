@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, has_request_context
 import psycopg2
 import os
 from dotenv import load_dotenv
@@ -33,11 +33,16 @@ except redis.RedisError as e:
     print(f"Redis connection failed: {e}")
 
 def invalidate_members_cache():
-    redis_client.delete("members:all")
-    invalidate_analytics_cache()
-    print("Members cache invalidated") 
+    try:
+        redis_client.delete("members:all")
+        print("Members cache invalidated")
+    except redis.RedisError as e:
+        app.logger.warning("Cache invalidation failed for members:all: %s", e)
+    invalidate_analytics_cache() 
 
 def invalidate_analytics_cache():
+    if not has_request_context():
+        return
     gym_id = getattr(request, "decoded_token", {}).get("gym_id")
     if gym_id is None:
         return
@@ -69,7 +74,12 @@ def cache_response(cache_key):
     return decorator
 
 def invalidate_caches(*keys):
-    redis_client.delete(*keys)
+    if not keys:
+        return
+    try:
+        redis_client.delete(*keys)
+    except redis.RedisError as e:
+        app.logger.warning("Cache invalidation failed for keys %s: %s", keys, e)
 
 def invalidate_branches_cache():
     invalidate_analytics_cache()
@@ -84,11 +94,14 @@ def invalidate_classes_cache():
     invalidate_caches("classes:all", "class_bookings:all")
 
 def invalidate_memberships_cache():
-    invalidate_analytics_cache()
-    invalidate_caches(
-        "memberships:all", "payments:all",
-        f"memberships:expiring:{datetime.date.today().isoformat()}"
-    )
+    try:
+        invalidate_analytics_cache()
+        invalidate_caches(
+            "memberships:all", "payments:all",
+            f"memberships:expiring:{datetime.date.today().isoformat()}"
+        )
+    except redis.RedisError as e:
+        app.logger.warning("Cache invalidation failed for memberships: %s", e)
 
 def invalidate_membership_plans_cache():
     invalidate_analytics_cache()
