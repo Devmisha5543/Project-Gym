@@ -94,7 +94,12 @@ def invalidate_caches(*keys):
 
 def invalidate_branches_cache():
     invalidate_analytics_cache()
+    gym_id = (
+        getattr(request, "decoded_token", {}).get("gym_id")
+        if has_request_context() else None
+    )
     invalidate_caches(
+        f"branches:{gym_id}" if gym_id is not None else "branches:all",
         "branches:all", "classes:all", "equipment:all", "trainer_branches:all"
     )
 
@@ -611,12 +616,16 @@ def db_check():
 
 @app.route("/branches")
 @token_required
-@cache_response("branches:all")
+@cache_response(lambda: f"branches:{request.decoded_token.get('gym_id')}")
 def get_branches():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT branch_id, name, address, phone, city FROM branch;")
+        cursor.execute(
+            "SELECT branch_id, name, address, phone, city "
+            "FROM branch WHERE gym_id = %s;",
+            (request.decoded_token.get("gym_id"),)
+        )
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -651,8 +660,12 @@ def create_branch():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO Branch (name, address, phone, city) VALUES(%s, %s, %s, %s) RETURNING branch_id;",
-            (data["name"], data["address"], data["phone"], data["city"])
+            "INSERT INTO Branch (name, address, phone, city, gym_id) "
+            "VALUES(%s, %s, %s, %s, %s) RETURNING branch_id;",
+            (
+                data["name"], data["address"], data["phone"], data["city"],
+                request.decoded_token.get("gym_id")
+            )
         )
         new_id = cursor.fetchone()[0]
         conn.commit()
@@ -674,8 +687,8 @@ def delete_branch(branch_id):
 
     try:
         cursor.execute(
-            "DELETE FROM Branch WHERE branch_id = %s;",
-            (branch_id,)
+            "DELETE FROM Branch WHERE branch_id = %s AND gym_id = %s;",
+            (branch_id, request.decoded_token.get("gym_id"))
         )
 
         if cursor.rowcount == 0:
@@ -722,8 +735,12 @@ def update_branch(branch_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Branch SET name = %s, address = %s, phone = %s, city=%s WHERE branch_id = %s;",
-            (data["name"], data["address"], data["phone"], data["city"], branch_id)
+            "UPDATE Branch SET name = %s, address = %s, phone = %s, city=%s "
+            "WHERE branch_id = %s AND gym_id = %s;",
+            (
+                data["name"], data["address"], data["phone"], data["city"],
+                branch_id, request.decoded_token.get("gym_id")
+            )
         )
 
         if cursor.rowcount == 0:
@@ -1266,8 +1283,9 @@ def get_expiring_memberships():
             FROM membership
             JOIN member
                 ON membership.member_id = member.member_id
-            WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
-              AND membership.status IN ('active', 'expired')
+            WHERE membership.end_date >= CURRENT_DATE
+              AND membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
+              AND membership.status <> 'cancelled'
               AND NOT EXISTS (
                   SELECT 1
                   FROM membership newer

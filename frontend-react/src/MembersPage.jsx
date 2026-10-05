@@ -74,13 +74,17 @@ function MembersPage() {
 
   function handleMemberUpdated(updatedMember) {
     setMembers(currentMembers => currentMembers.map(member => (
-      member.member_id === updatedMember.member_id ? updatedMember : member
+      String(member.member_id) === String(updatedMember.member_id) ? updatedMember : member
     )))
   }
 
   function handleMemberDeleted(memberId) {
+    const deletedId = String(memberId)
     setMembers(currentMembers => currentMembers.filter(member => (
-      member.member_id !== memberId
+      String(member.member_id) !== deletedId
+    )))
+    setMemberships(currentMemberships => currentMemberships.filter(membership => (
+      String(membership.member_id) !== deletedId
     )))
   }
 
