@@ -150,7 +150,7 @@ function MemberDetail({
       .then(response => (
         response.json().catch(() => ({})).then(data => {
           if (!response.ok) {
-            throw new Error(t('deleteMemberFailed'))
+            throw new Error(data.error || t('deleteMemberFailed'))
           }
 
           return data
@@ -163,7 +163,7 @@ function MemberDetail({
       })
       .catch(error => {
         console.error('Failed to delete member:', error)
-        onFeedback?.('members:deleteMemberFailed', 'error')
+        onFeedback?.(error.message || t('deleteMemberFailed'), 'error')
       })
       .finally(() => setDeleting(false))
   }

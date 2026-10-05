@@ -65,7 +65,14 @@ def cache_response(cache_key):
             except redis.RedisError:
                 cached = None
             if cached:
-                return jsonify(json.loads(cached))
+                payload = json.loads(cached)
+                if isinstance(payload, list):
+                    for item in payload:
+                        if isinstance(item, dict) and "photo_filename" in item:
+                            item["photo_filename"] = available_member_photo(
+                                item.get("photo_filename")
+                            )
+                return jsonify(payload)
 
             response = app.make_response(f(*args, **kwargs))
             if response.status_code == 200:
@@ -153,6 +160,7 @@ app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 CORS(app, origins=[
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    re.compile(r"^http://(?:localhost|127\.0\.0\.1):\d+$"),
     re.compile(r"^http://(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}):5173$"),
     "https://project-gym-zeta.vercel.app"
 ])
@@ -438,6 +446,17 @@ def is_valid_member_photo(file):
         ".webp": header[:4] == b"RIFF" and header[8:12] == b"WEBP",
     }
     return extension in ALLOWED_MEMBER_PHOTO_EXTENSIONS and valid_signatures.get(extension, False)
+
+def available_member_photo(filename):
+    if not filename:
+        return None
+
+    safe_filename = secure_filename(str(filename))
+    if safe_filename != str(filename):
+        return None
+
+    photo_path = os.path.join(app.config["UPLOAD_FOLDER"], safe_filename)
+    return safe_filename if os.path.isfile(photo_path) else None
 
 @app.route("/gym", methods=["GET"])
 @token_required
@@ -732,7 +751,12 @@ def get_members():
 
     if cached_members:
         print("Members loaded from Redis")
-        return jsonify(json.loads(cached_members))
+        members = json.loads(cached_members)
+        for member in members:
+            member["photo_filename"] = available_member_photo(
+                member.get("photo_filename")
+            )
+        return jsonify(members)
 
     # 2. Cache miss → get data from PostgreSQL
     print("Members loaded from PostgreSQL")
@@ -763,7 +787,7 @@ def get_members():
             "address": row[5],
             "join_date": row[6],
             "wants_trainer": row[7],
-            "photo_filename": row[8]
+            "photo_filename": available_member_photo(row[8])
         })
 
     # 3. Store result in Redis for 5 minutes
@@ -885,6 +909,23 @@ def delete_member(member_id):
 
     try:
         cursor.execute(
+            "DELETE FROM Payment WHERE membership_id IN "
+            "(SELECT membership_id FROM Membership WHERE member_id = %s);",
+            (member_id,)
+        )
+        cursor.execute(
+            "DELETE FROM Membership WHERE member_id = %s;",
+            (member_id,)
+        )
+        cursor.execute(
+            "DELETE FROM ClassBooking WHERE member_id = %s;",
+            (member_id,)
+        )
+        cursor.execute(
+            "DELETE FROM PersonalTrainingAssignment WHERE member_id = %s;",
+            (member_id,)
+        )
+        cursor.execute(
             "DELETE FROM Member WHERE member_id = %s;",
             (member_id,)
         )
@@ -901,7 +942,8 @@ def delete_member(member_id):
         return jsonify({"error": "This member cannot be deleted while memberships, bookings, or assignments still reference them."}), 409
     except Exception:
         conn.rollback()
-        raise
+        app.logger.exception("Failed to delete member %s", member_id)
+        return jsonify({"error": "Failed to delete member and related records."}), 500
     finally:
         cursor.close()
         conn.close()
@@ -909,7 +951,9 @@ def delete_member(member_id):
     # Invalidate cached member list after successful deletion
     invalidate_members_cache()
     invalidate_memberships_cache()
-    invalidate_caches("class_bookings:all", "personal_training_assignments:all")
+    invalidate_class_bookings_cache()
+    invalidate_personal_training_assignments_cache()
+    invalidate_payments_cache()
 
     return jsonify({
         "message": f"Member {member_id} deleted"
@@ -1255,7 +1299,7 @@ def get_expiring_memberships():
             "address": row[6],
             "join_date": row[7].isoformat() if row[7] else None,
             "wants_trainer": row[8],
-            "photo_filename": row[9],
+            "photo_filename": available_member_photo(row[9]),
             "start_date": row[10].isoformat() if row[10] else None,
             "end_date": row[11].isoformat() if row[11] else None,
             "status": row[12]

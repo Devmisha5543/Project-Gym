@@ -38,6 +38,8 @@ function SettingsPage() {
   // Populate form with current gym data
   useEffect(() => {
     if (gym) {
+      // Synchronize editable form state with the loaded gym profile.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         name: gym.name || '',
         phone: gym.phone || '',

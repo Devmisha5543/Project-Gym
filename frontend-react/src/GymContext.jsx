@@ -43,6 +43,8 @@ export function GymProvider({ children }) {
   }, [])
 
   useEffect(() => {
+    // The fetch updates loading and error state as part of the external request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchGym()
   }, [fetchGym])
 
@@ -60,6 +62,7 @@ export function GymProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGym() {
   const context = useContext(GymContext)
   if (!context) {
@@ -72,6 +75,8 @@ export function GymBrandMark({ logoUrl, name, className = '' }) {
   const [imgError, setImgError] = useState(false)
 
   useEffect(() => {
+    // Reset the fallback state when the configured logo changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setImgError(false)
   }, [logoUrl])
 
