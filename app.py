@@ -758,28 +758,36 @@ def update_branch(branch_id):
     invalidate_branches_cache()
     return jsonify({"message": f"Branch {branch_id} updated"}), 200
 
+
 @app.route("/members")
 @token_required
 def get_members():
     cache_key = "members:all"
 
-    # 1. Check Redis first
-    cached_members = redis_client.get(cache_key)
+    # 1. Try Redis first, but never let Redis failure break the API
+    try:
+        cached_members = redis_client.get(cache_key)
+    except redis.RedisError as e:
+        app.logger.warning("Redis unavailable while loading members: %s", e)
+        cached_members = None
 
     if cached_members:
         print("Members loaded from Redis")
         members = json.loads(cached_members)
+
         for member in members:
             member["photo_filename"] = available_member_photo(
                 member.get("photo_filename")
             )
+
         return jsonify(members)
 
-    # 2. Cache miss → get data from PostgreSQL
+    # 2. Redis unavailable or cache miss → PostgreSQL
     print("Members loaded from PostgreSQL")
 
     conn = get_db_connection()
     cursor = conn.cursor()
+
     try:
         cursor.execute("""
             SELECT member_id, branch_id, name, gender, phone, address,
@@ -788,6 +796,7 @@ def get_members():
         """)
 
         rows = cursor.fetchall()
+
     finally:
         cursor.close()
         conn.close()
@@ -807,12 +816,15 @@ def get_members():
             "photo_filename": available_member_photo(row[8])
         })
 
-    # 3. Store result in Redis for 5 minutes
-    redis_client.setex(
-        cache_key,
-        300,
-        json.dumps(members, default=str)
-    )
+    # 3. Try to cache, but don't fail the request if Redis is unavailable
+    try:
+        redis_client.setex(
+            cache_key,
+            300,
+            json.dumps(members, default=str)
+        )
+    except redis.RedisError as e:
+        app.logger.warning("Redis unavailable while caching members: %s", e)
 
     return jsonify(members)
 @app.route("/members", methods=["POST"])
