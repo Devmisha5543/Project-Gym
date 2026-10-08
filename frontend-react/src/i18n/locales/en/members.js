@@ -104,6 +104,7 @@ export default {
   registerNewMember: 'Register a new gym member',
   loadingMembershipPlans: 'Loading membership plans...',
   uploadProfilePhoto: 'Upload profile photo',
+  photoRequired: 'A profile photo is required.',
   photoPreview: 'Photo preview',
   memberCreated: 'Member created successfully.',
   dismiss: 'Dismiss'

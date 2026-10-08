@@ -174,6 +174,14 @@ function MemberForm({ onMemberCreated }) {
       return
     }
 
+    if (!photo) {
+      setErrors({
+        photo: t('photoRequired')
+      })
+
+      return
+    }
+
     if (loadingBranches || loadingPlans) {
       setErrors({
         general: t('memberOptionsLoading')
@@ -504,16 +512,23 @@ function MemberForm({ onMemberCreated }) {
               <span>
                 {photo
                   ? photo.name
-                  : t('uploadProfilePhoto')}
+                  : `${t('uploadProfilePhoto')} *`}
               </span>
 
               <input
                 type="file"
                 accept="image/*"
+                required
                 onChange={handlePhotoChange}
               />
 
             </label>
+
+            {errors.photo && (
+              <span className="field-error">
+                {errors.photo}
+              </span>
+            )}
 
           </div>
 

@@ -104,6 +104,7 @@ export default {
   registerNewMember: 'አዲስ የጂም አባል ይመዝግቡ',
   loadingMembershipPlans: 'የአባልነት ዕቅዶችን በመጫን ላይ...',
   uploadProfilePhoto: 'የመገለጫ ፎቶ ጫን',
+  photoRequired: 'የመገለጫ ፎቶ ያስፈልጋል።',
   photoPreview: 'የፎቶ ቅድመ እይታ',
   memberCreated: 'አባሉ በተሳካ ሁኔታ ተፈጥሯል።',
   dismiss: 'ዝጋ'
