@@ -29,5 +29,18 @@ export default {
   passwordsDoNotMatch: 'የይለፍ ቃሎቹ አይዛመዱም።',
   resetFailed: 'የይለፍ ቃሉን ማስጀመር አልተቻለም። አዲስ አገናኝ ይጠይቁና እንደገና ይሞክሩ።',
   invalidCredentials: 'ኢሜይሉ ወይም የይለፍ ቃሉ ልክ አይደለም።',
-  sessionExpired: 'የመግቢያ ጊዜዎ አልቋል። እባክዎ እንደገና ይግቡ።'
+  sessionExpired: 'የመግቢያ ጊዜዎ አልቋል። እባክዎ እንደገና ይግቡ።',
+  or: 'ወይም',
+  continueWithGoogle: 'በGoogle ቀጥል',
+  completingGoogleSignIn: 'የGoogle መግቢያን በማጠናቀቅ ላይ...',
+  googleSignInFailed: 'የGoogle መግቢያ አልተሳካም',
+  googleSignInFailedDescription: 'የGoogle መግቢያን ማጠናቀቅ አልተቻለም። እንደገና ይሞክሩ።',
+  oauthErrors: {
+    google_account_not_found: 'የGoogle ኢሜይልዎ ከጂም አስተዳዳሪ መለያ ጋር አልተገናኘም።',
+    google_email_unverified: 'Google የተረጋገጠ ኢሜይል አላቀረበም።',
+    google_state_expired: 'የGoogle መግቢያ ጥያቄ ጊዜው አልፏል።',
+    google_not_configured: 'የGoogle መግቢያ እስካሁን አልተዋቀረም።',
+    google_authorization_failed: 'የGoogle ፍቃድ ማግኘት አልተቻለም።',
+    google_sign_in_failed: 'የGoogle መለያዎን ማገናኘት አልተቻለም።'
+  }
 }

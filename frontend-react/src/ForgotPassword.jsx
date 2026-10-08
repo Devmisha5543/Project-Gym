@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { API_URL } from './config'
 import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import GoogleAuthButton from './GoogleAuthButton'
 
 function ForgotPassword() {
   const { t } = useTranslation('auth')
@@ -41,6 +42,7 @@ function ForgotPassword() {
             <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? t('sending') : t('sendResetLink')}</button>
           </form>
         )}
+        <GoogleAuthButton />
         <Link to="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 18, color: '#c48bff', fontSize: 12, textDecoration: 'none' }}><ArrowLeft size={14} /> {t('backToSignIn')}</Link>
       </section>
     </main>

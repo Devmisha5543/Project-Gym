@@ -29,5 +29,18 @@ export default {
   passwordsDoNotMatch: 'Passwords do not match.',
   resetFailed: 'Unable to reset your password. Request a new link and try again.',
   invalidCredentials: 'Invalid email or password.',
-  sessionExpired: 'Your session has expired. Please sign in again.'
+  sessionExpired: 'Your session has expired. Please sign in again.',
+  or: 'or',
+  continueWithGoogle: 'Continue with Google',
+  completingGoogleSignIn: 'Completing Google sign-in...',
+  googleSignInFailed: 'Google sign-in failed',
+  googleSignInFailedDescription: 'We could not complete Google sign-in. Please try again.',
+  oauthErrors: {
+    google_account_not_found: 'Your Google email is not linked to a gym administrator account.',
+    google_email_unverified: 'Google did not provide a verified email address.',
+    google_state_expired: 'The Google sign-in request expired. Please try again.',
+    google_not_configured: 'Google sign-in is not configured yet.',
+    google_authorization_failed: 'Google authorization could not be completed.',
+    google_sign_in_failed: 'Your Google account could not be linked.'
+  }
 }

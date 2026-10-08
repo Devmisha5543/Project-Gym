@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, has_request_context
+from flask import Flask, jsonify, request, has_request_context, redirect
 import psycopg2
 import os
 from dotenv import load_dotenv
@@ -15,6 +15,9 @@ from flask import request
 import redis
 import json
 import re
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from concurrent.futures import ThreadPoolExecutor
 from email_service import send_password_changed_email, send_reset_email
 
@@ -158,6 +161,7 @@ app = Flask(__name__)
 _password_reset_executor = ThreadPoolExecutor(max_workers=2)
 _PASSWORD_RESET_RATE_LIMIT = 3
 _PASSWORD_RESET_RATE_WINDOW = 60 * 60
+_GOOGLE_STATE_MAX_AGE = 600
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -323,6 +327,165 @@ def _send_password_changed_notification(email):
         send_password_changed_email(email)
     except Exception:
         app.logger.error("Password change confirmation email delivery failed")
+
+
+def _google_oauth_config():
+    return {
+        "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+        "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+        "redirect_uri": os.getenv(
+            "GOOGLE_REDIRECT_URI",
+            "http://localhost:5000/auth/google/callback"
+        ),
+        "frontend_url": os.getenv("FRONTEND_URL", "http://localhost:5173")
+    }
+
+
+def _google_oauth_ready(config):
+    return bool(config["client_id"] and config["client_secret"])
+
+
+def _google_state_serializer():
+    return URLSafeTimedSerializer(
+        os.getenv("JWT_SECRET"),
+        salt="project-gym-google-oauth"
+    )
+
+
+def _google_request(url, data=None, headers=None):
+    encoded_data = urlencode(data).encode("utf-8") if data else None
+    request_headers = headers or {}
+    if data:
+        request_headers = {
+            **request_headers,
+            "Content-Type": "application/x-www-form-urlencoded"
+        }
+    request = UrlRequest(url, data=encoded_data, headers=request_headers)
+    with urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _create_admin_token(admin_id, gym_id):
+    issued_at = datetime.datetime.now(datetime.timezone.utc)
+    return jwt.encode(
+        {
+            "admin_id": admin_id,
+            "role": "admin",
+            "gym_id": gym_id,
+            "iat": issued_at.timestamp(),
+            "exp": issued_at + datetime.timedelta(hours=8)
+        },
+        os.getenv("JWT_SECRET"),
+        algorithm="HS256"
+    )
+
+
+def _oauth_callback_redirect(config, **params):
+    callback_url = f"{config['frontend_url'].rstrip('/')}/oauth/callback"
+    return redirect(f"{callback_url}?{urlencode(params)}")
+
+
+@app.route("/auth/google/start")
+def google_oauth_start():
+    config = _google_oauth_config()
+    if not _google_oauth_ready(config):
+        return jsonify({"error": "Google sign-in is not configured."}), 503
+
+    state = _google_state_serializer().dumps({"nonce": secrets.token_urlsafe(24)})
+    query = urlencode({
+        "client_id": config["client_id"],
+        "redirect_uri": config["redirect_uri"],
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "state": state,
+        "prompt": "select_account"
+    })
+    return redirect(f"https://accounts.google.com/o/oauth2/v2/auth?{query}")
+
+
+@app.route("/auth/google/callback")
+def google_oauth_callback():
+    config = _google_oauth_config()
+    if not _google_oauth_ready(config):
+        return _oauth_callback_redirect(config, error="google_not_configured")
+
+    state = request.args.get("state", "")
+    code = request.args.get("code", "")
+    if not state or not code:
+        return _oauth_callback_redirect(config, error="google_authorization_failed")
+
+    try:
+        _google_state_serializer().loads(state, max_age=_GOOGLE_STATE_MAX_AGE)
+        token_data = _google_request(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": config["client_id"],
+                "client_secret": config["client_secret"],
+                "redirect_uri": config["redirect_uri"],
+                "grant_type": "authorization_code"
+            }
+        )
+        access_token = token_data.get("access_token")
+        if not access_token:
+            raise ValueError("Google did not return an access token")
+        google_user = _google_request(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+    except (BadSignature, SignatureExpired):
+        return _oauth_callback_redirect(config, error="google_state_expired")
+    except Exception:
+        app.logger.exception("Google OAuth callback failed")
+        return _oauth_callback_redirect(config, error="google_authorization_failed")
+
+    google_sub = google_user.get("sub")
+    email = google_user.get("email", "").strip().lower()
+    if not google_sub or not email or google_user.get("email_verified") is not True:
+        return _oauth_callback_redirect(config, error="google_email_unverified")
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT admin_id, name, email, gym_id FROM admin WHERE google_sub = %s LIMIT 1;",
+            (google_sub,)
+        )
+        admin = cursor.fetchone()
+        if admin is None:
+            cursor.execute(
+                "SELECT admin_id, name, email, gym_id FROM admin WHERE LOWER(email) = %s LIMIT 1 FOR UPDATE;",
+                (email,)
+            )
+            admin = cursor.fetchone()
+            if admin is None:
+                conn.rollback()
+                return _oauth_callback_redirect(config, error="google_account_not_found")
+            cursor.execute(
+                "UPDATE admin SET google_sub = %s WHERE admin_id = %s;",
+                (google_sub, admin[0])
+            )
+        conn.commit()
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.exception("Google OAuth account linking failed")
+        return _oauth_callback_redirect(config, error="google_sign_in_failed")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+    admin_id, name, _, gym_id = admin
+    return _oauth_callback_redirect(
+        config,
+        token=_create_admin_token(admin_id, gym_id),
+        name=name
+    )
 
 
 @app.route("/auth/forgot-password", methods=["POST"])

@@ -25,6 +25,7 @@ import DashboardPage from './DashboardPage'
 import LoginPage from './LoginPage'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
+import OAuthCallback from './OAuthCallback'
 import MobileNavigation from './MobileNavigation'
 import SettingsPage from './ModernSettingsPage'
 import { GymProvider, useGym, GymBrandMark } from './GymContext'
@@ -233,6 +234,7 @@ function App() {
 
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/oauth/callback" element={<OAuthCallback />} />
 
 
       {/* PROTECTED ROUTES */}

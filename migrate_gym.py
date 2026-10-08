@@ -24,6 +24,7 @@ def run_migration():
         for migration_name in (
             "001_create_gym_table.sql",
             "002_create_password_reset_tokens.sql",
+            "003_add_google_oauth_to_admin.sql",
         ):
             sql_path = os.path.join(migrations_dir, migration_name)
             with open(sql_path, "r", encoding="utf-8") as f:
