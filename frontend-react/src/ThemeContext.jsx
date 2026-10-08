@@ -3,26 +3,47 @@ import { createContext, useContext, useEffect, useState } from 'react'
 const ThemeContext = createContext(null)
 const THEME_STORAGE_KEY = 'project-gym-theme'
 
-function getInitialTheme() {
-  const theme = localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark'
-  document.documentElement.dataset.theme = theme
-  return theme
+function getStoredThemePreference() {
+  const storedTheme = localStorage.getItem(THEME_STORAGE_KEY)
+  return ['light', 'dark', 'system'].includes(storedTheme) ? storedTheme : 'dark'
+}
+
+function resolveTheme(preference) {
+  if (preference !== 'system') return preference
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(getInitialTheme)
+  const [themePreference, setThemePreference] = useState(getStoredThemePreference)
+  const [theme, setTheme] = useState(() => resolveTheme(themePreference))
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme
-    localStorage.setItem(THEME_STORAGE_KEY, theme)
-  }, [theme])
+    function applyTheme() {
+      setTheme(resolveTheme(themePreference))
+    }
+
+    applyTheme()
+    document.documentElement.dataset.theme = resolveTheme(themePreference)
+    localStorage.setItem(THEME_STORAGE_KEY, themePreference)
+
+    if (themePreference !== 'system') return undefined
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)')
+    mediaQuery.addEventListener('change', applyTheme)
+    return () => mediaQuery.removeEventListener('change', applyTheme)
+  }, [themePreference])
 
   function toggleTheme() {
-    setTheme(current => current === 'dark' ? 'light' : 'dark')
+    setThemePreference(current => current === 'dark' ? 'light' : 'dark')
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{
+      theme,
+      themePreference,
+      setThemePreference,
+      toggleTheme
+    }}>
       {children}
     </ThemeContext.Provider>
   )

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useGym, GymBrandMark } from './GymContext'
 import { useTheme } from './ThemeContext'
+import { useFeatureVisibility } from './FeatureVisibilityContext'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
@@ -39,12 +40,13 @@ const moreRoutes = [
     path: '/personaltrainingassignments',
     label: 'personalTraining',
     icon: Dumbbell,
+    featureKey: 'ptAssignments',
   },
-  { path: '/classes', label: 'classes', icon: Calendar },
-  { path: '/classbookings', label: 'classBookings', icon: CalendarCheck },
-  { path: '/payments', label: 'payments', icon: Receipt },
-  { path: '/equipment', label: 'equipment', icon: Layers },
-  { path: '/trainerbranch', label: 'trainerBranch', icon: GitBranch },
+  { path: '/classes', label: 'classes', icon: Calendar, featureKey: 'classes' },
+  { path: '/classbookings', label: 'classBookings', icon: CalendarCheck, featureKey: 'classBookings' },
+  { path: '/payments', label: 'payments', icon: Receipt, featureKey: 'payments' },
+  { path: '/equipment', label: 'equipment', icon: Layers, featureKey: 'equipment' },
+  { path: '/trainerbranch', label: 'trainerBranch', icon: GitBranch, featureKey: 'trainerBranch' },
   { path: '/admins', label: 'admin', icon: Shield },
   { path: '/settings', label: 'settings', icon: Settings },
 ]
@@ -75,6 +77,7 @@ export default function MobileNavigation({ onLogout }) {
   const location = useLocation()
   const { gym, loading: gymLoading } = useGym()
   const { theme, toggleTheme } = useTheme()
+  const { visibility } = useFeatureVisibility()
   const reduceMotion = useReducedMotion()
   const menuTransition = { duration: reduceMotion ? 0 : 0.2, ease: 'easeOut' }
 
@@ -102,8 +105,12 @@ export default function MobileNavigation({ onLogout }) {
     return null
   }
 
-  const isMoreActive = moreRoutes.some(
-    (route) => location.pathname === route.path
+  const visibleMoreRoutes = moreRoutes.filter(
+    route => !route.featureKey || visibility[route.featureKey]
+  )
+
+  const isMoreActive = visibleMoreRoutes.some(
+    route => location.pathname === route.path
   )
 
   const gymName = gym?.name || 'Project Gym'
@@ -209,7 +216,7 @@ export default function MobileNavigation({ onLogout }) {
             </div>
 
             <div className="mobile-sheet-list">
-              {moreRoutes.map((route) => {
+              {visibleMoreRoutes.map((route) => {
                 const Icon = route.icon
                 return (
                   <NavLink

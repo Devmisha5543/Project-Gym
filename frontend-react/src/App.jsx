@@ -26,47 +26,34 @@ import LoginPage from './LoginPage'
 import ForgotPassword from './ForgotPassword'
 import ResetPassword from './ResetPassword'
 import MobileNavigation from './MobileNavigation'
-import SettingsPage from './SettingsPage'
+import SettingsPage from './ModernSettingsPage'
 import { GymProvider, useGym, GymBrandMark } from './GymContext'
 import { Moon, Sun } from 'lucide-react'
 import { ThemeProvider, useTheme } from './ThemeContext'
+import { FeatureVisibilityProvider, useFeatureVisibility } from './FeatureVisibilityContext'
 import { useTranslation } from 'react-i18next'
 
 
 const navigation = [
   {
-    title: 'main',
+    title: 'management',
     items: [
       { path: '/dashboard', label: 'dashboard' },
       { path: '/analytics', label: 'analytics' },
       { path: '/members', label: 'members' },
       { path: '/branches', label: 'branches' },
       { path: '/trainers', label: 'trainers' },
-    ],
-  },
-  {
-    title: 'management',
-    items: [
       { path: '/membershipplans', label: 'membershipPlans' },
       {
         path: '/personaltrainingassignments',
         label: 'ptAssignments',
+        featureKey: 'ptAssignments',
       },
-      { path: '/classes', label: 'classes' },
-      { path: '/classbookings', label: 'classBookings' },
-      { path: '/payments', label: 'payments' },
-      { path: '/equipment', label: 'equipment' },
-    ],
-  },
-  {
-    title: 'relationships',
-    items: [
-      { path: '/trainerbranch', label: 'trainerBranch' },
-    ],
-  },
-  {
-    title: 'system',
-    items: [
+      { path: '/classes', label: 'classes', featureKey: 'classes' },
+      { path: '/classbookings', label: 'classBookings', featureKey: 'classBookings' },
+      { path: '/payments', label: 'payments', featureKey: 'payments' },
+      { path: '/equipment', label: 'equipment', featureKey: 'equipment' },
+      { path: '/trainerbranch', label: 'trainerBranch', featureKey: 'trainerBranch' },
       { path: '/admins', label: 'admins' },
       { path: '/settings', label: 'settings' },
     ],
@@ -79,6 +66,7 @@ function ProtectedLayout() {
   const navigate = useNavigate()
   const { gym, loading: gymLoading } = useGym()
   const { theme, toggleTheme } = useTheme()
+  const { visibility } = useFeatureVisibility()
 
   function handleLogout() {
     localStorage.removeItem('token')
@@ -123,7 +111,9 @@ function ProtectedLayout() {
                 {t(section.title)}
               </p>
 
-              {section.items.map(item => (
+              {section.items
+                .filter(item => !item.featureKey || visibility[item.featureKey])
+                .map(item => (
 
                 <NavLink
                   key={item.path}
@@ -141,7 +131,7 @@ function ProtectedLayout() {
 
                 </NavLink>
 
-              ))}
+                ))}
 
             </div>
 
@@ -232,6 +222,7 @@ function App() {
 
   return (
     <ThemeProvider>
+    <FeatureVisibilityProvider>
     <Routes>
 
       {/* LOGIN */}
@@ -344,6 +335,7 @@ function App() {
       />
 
     </Routes>
+    </FeatureVisibilityProvider>
     </ThemeProvider>
   )
 }

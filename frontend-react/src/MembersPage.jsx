@@ -435,7 +435,7 @@ function MembersPage() {
 
 
       {/* API error */}
-      ]{pageError && (
+      {pageError && (
   <div className="member-error-state">
     <div className="member-error-icon">
       <AlertCircle size={20} />

@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import LanguageSelector from './LanguageSelector'
 import {
   Building2,
+  Layers,
   Save,
   Phone,
   Mail,
@@ -16,10 +17,13 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react'
+import { useFeatureVisibility } from './FeatureVisibilityContext'
+import { SIDEBAR_FEATURES } from './featureVisibility'
 
 function SettingsPage() {
-  const { t } = useTranslation(['settings', 'common', 'validation'])
+  const { t } = useTranslation(['settings', 'common', 'validation', 'navigation'])
   const { gym, loading, error, refreshGym, updateGym } = useGym()
+  const { visibility, setFeatureVisibility } = useFeatureVisibility()
 
   const [formData, setFormData] = useState({
     name: '',
@@ -224,6 +228,32 @@ function SettingsPage() {
           <div><h2>{t('language')}</h2><p>{t('languageDescription')}</p></div>
         </div>
         <LanguageSelector />
+      </section>
+
+      <section className="settings-form-section settings-features-section">
+        <div className="settings-form-heading">
+          <div className="settings-form-icon"><Layers size={19} /></div>
+          <div>
+            <h2>{t('sidebarPages')}</h2>
+            <p>{t('sidebarPagesDescription')}</p>
+          </div>
+        </div>
+
+        <div className="settings-feature-list">
+          {SIDEBAR_FEATURES.map(feature => (
+            <label className="settings-feature-toggle" key={feature.key}>
+              <span>
+                <strong>{t(`navigation:${feature.label}`)}</strong>
+                <small>{t(`featureDescriptions.${feature.key}`)}</small>
+              </span>
+              <input
+                type="checkbox"
+                checked={visibility[feature.key]}
+                onChange={event => setFeatureVisibility(feature.key, event.target.checked)}
+              />
+            </label>
+          ))}
+        </div>
       </section>
 
       {/* MAIN CONTENT: GYM PROFILE */}
