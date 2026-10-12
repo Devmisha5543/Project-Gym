@@ -2,12 +2,19 @@ export default {
   managementPlatform: 'Management platform',
   secureAdminAccess: 'SECURE ADMIN ACCESS',
   welcomeBack: 'Welcome back',
-  loginDescription: 'Sign in to manage your gym operations.',
+  loginTitle: 'Your gym, under control.',
+  loginDescription: 'Manage members, memberships, payments, and daily gym operations in one place.'
+  ,emailRequired: 'Enter your email address.'
+  ,emailInvalid: 'Enter a valid email address.'
+  ,passwordRequired: 'Enter your password.'
+  ,accountLocked: 'Sign-in is temporarily locked after too many attempts.'
+  ,accountLockedHelp: 'Please contact your gym administrator to restore access.'
+  ,loginRateLimited: 'Too many sign-in attempts. Wait a moment and try again.'
   emailAddress: 'Email address',
   password: 'Password',
   enterPassword: 'Enter your password',
   forgotPassword: 'Forgot password?',
-  loginFailed: 'Login failed. Check your email and password.',
+  loginFailed: 'We could not sign you in. Please try again.'
   signIn: 'Sign in',
   signingIn: 'Signing you in...',
   accountRecovery: 'ACCOUNT RECOVERY',
