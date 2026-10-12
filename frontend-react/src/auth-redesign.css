@@ -278,3 +278,31 @@
     box-shadow: none;
   }
 }
+
+
+/* Preserve the grounded layout when the app's light theme is selected. */
+html[data-theme="light"] .login-card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+html[data-theme="light"] .login-brand strong,
+html[data-theme="light"] .login-heading h1 {
+  color: var(--text-primary, #f5f5f5);
+}
+
+html[data-theme="light"] .login-brand span,
+html[data-theme="light"] .login-heading p {
+  color: var(--text-secondary, #999);
+}
+
+html[data-theme="light"] .dashboard .dashboard-header {
+  background: var(--surface, #111);
+  box-shadow: none;
+}
+
+html[data-theme="light"] .dashboard .dashboard-stat-card {
+  background: var(--surface, #101010);
+  box-shadow: none;
+}
