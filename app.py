@@ -148,9 +148,15 @@ def invalidate_admins_cache():
 def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
     if database_url:
-        return psycopg2.connect(database_url)
-    else:
-        return psycopg2.connect(
+        try:
+            return psycopg2.connect(database_url, connect_timeout=5)
+        except psycopg2.Error as error:
+            app.logger.warning(
+                "Configured database is unavailable; using local PostgreSQL fallback: %s",
+                error,
+            )
+
+    return psycopg2.connect(
             host="localhost",
             database="gym_db",
             user="postgres",
