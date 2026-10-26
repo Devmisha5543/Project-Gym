@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import ClassBookingList from './ClassBookingList'
 import ClassBookingForm from './ClassBookingForm'
-import { CalendarCheck, Receipt } from 'lucide-react'
+import { CalendarCheck } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function ClassBookingPage() {
   const { t } = useTranslation(['classes', 'common'])
@@ -49,12 +50,7 @@ function ClassBookingPage() {
         </div>
       </div>
       <ClassBookingForm onClassBookingCreated={loadClassBookings} />
-      {pageError && (
-        <div className="class-booking-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
       {loading ? (
         <div className="class-booking-state">
           <div className="loading-spinner"></div>

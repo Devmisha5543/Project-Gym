@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Building2, MapPin, Phone, Pencil, Trash2, Save, X } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
   const { t } = useTranslation(['people', 'common'])
@@ -46,6 +48,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
   }
 
   function handleEditChange(field, value) {
+    setError('')
     setEditForm(prev => ({
       ...prev,
       [field]: value
@@ -97,6 +100,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       }
 
       setEditingId(null)
+      notify(t('branchUpdated'), 'success')
 
       if (onBranchUpdated) {
         onBranchUpdated()
@@ -138,6 +142,7 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
       if (onBranchDeleted) {
         onBranchDeleted()
       }
+      notify(t('branchDeleted'), 'success')
     } catch (err) {
       console.error('Failed to delete branch:', err)
       setError(err.message || t('branchDeleteFailed'))
@@ -148,25 +153,24 @@ function BranchList({ branches, onBranchUpdated, onBranchDeleted }) {
 
   if (branches.length === 0) {
     return (
-      <div className="branch-state branch-empty-state">
-        <div className="branch-state-icon">
-          <Building2 size={25} />
-        </div>
+      <>
+        <FeedbackMessage message={error} />
+        <div className="branch-state branch-empty-state">
+          <div className="branch-state-icon">
+            <Building2 size={25} />
+          </div>
 
-        <h3>{t('noBranches')}</h3>
-        <p>{t('addBranchHelp')}</p>
-      </div>
+          <h3>{t('noBranches')}</h3>
+          <p>{t('addBranchHelp')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="branch-list">
 
-      {error && (
-        <div className="branch-feedback branch-feedback-error">
-          <span>{error}</span>
-        </div>
-      )}
+      <FeedbackMessage message={error} />
 
       {branches.map(branch => (
         <article className="branch-card" key={branch.branch_id}>

@@ -5,7 +5,6 @@ import {
   Bell,
   Building2,
   Check,
-  CheckCircle2,
   Coins,
   Globe,
   Image,
@@ -27,6 +26,7 @@ import { useFeatureVisibility } from './FeatureVisibilityContext'
 import { SIDEBAR_FEATURES } from './featureVisibility'
 import { useTheme } from './ThemeContext'
 import LanguageSelector from './LanguageSelector'
+import FeedbackMessage from './FeedbackMessage'
 
 const NOTIFICATION_STORAGE_KEY = 'project-gym-notification-preferences'
 
@@ -239,18 +239,8 @@ function ModernSettingsPage() {
     <div className="modern-settings-page">
       {pageHeader}
 
-      {submitError && (
-        <div className="modern-settings-feedback is-error" role="alert">
-          <AlertCircle size={17} />
-          <span>{t(submitError === 'networkError' ? 'common:networkError' : submitError)}</span>
-        </div>
-      )}
-      {successMessage && (
-        <div className="modern-settings-feedback is-success" role="status">
-          <CheckCircle2 size={17} />
-          <span>{t(successMessage)}</span>
-        </div>
-      )}
+      <FeedbackMessage message={submitError && t(submitError === 'networkError' ? 'common:networkError' : submitError)} />
+      <FeedbackMessage message={successMessage && t(successMessage)} type="success" />
 
       <section className="modern-settings-card">
         <SectionHeader icon={Globe} title={t('language')} description={t('languageDescription')} />

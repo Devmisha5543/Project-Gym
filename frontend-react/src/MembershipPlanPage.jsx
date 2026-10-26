@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import MembershipPlanList from './MembershipPlanList'
 import MembershipPlanForm from './MembershipPlanForm'
-import { CreditCard, Receipt } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
+import { CreditCard } from 'lucide-react'
 
 function MembershipPlanPage() {
   const { t } = useTranslation(['payments', 'common'])
@@ -58,12 +59,7 @@ function MembershipPlanPage() {
 
       <MembershipPlanForm onMembershipPlanCreated={loadMembershipPlans} />
 
-      {pageError && (
-        <div className="plan-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="plan-state">

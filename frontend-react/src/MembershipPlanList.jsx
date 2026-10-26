@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function MembershipPlanList({
   membershipPlans,
@@ -58,6 +60,7 @@ function MembershipPlanList({
   }
 
   function handleEditChange(field, value) {
+    setError('')
     setEditForm(prev => ({
       ...prev,
       [field]: value
@@ -109,6 +112,7 @@ function MembershipPlanList({
       }
 
       setEditingId(null)
+      notify(t('planUpdated'), 'success')
 
       if (onPlanUpdated) {
         onPlanUpdated()
@@ -152,6 +156,7 @@ function MembershipPlanList({
       if (onPlanDeleted) {
         onPlanDeleted()
       }
+      notify(t('planDeleted'), 'success')
     } catch (err) {
       console.error('Failed to delete membership plan:', err)
       setError(
@@ -164,25 +169,24 @@ function MembershipPlanList({
 
   if (membershipPlans.length === 0) {
     return (
-      <div className="plan-state plan-empty-state">
-        <div className="plan-state-icon">
-          <CreditCard size={25} />
-        </div>
+      <>
+        <FeedbackMessage message={error} />
+        <div className="plan-state plan-empty-state">
+          <div className="plan-state-icon">
+            <CreditCard size={25} />
+          </div>
 
-        <h3>{t('noPlans')}</h3>
-        <p>{t('noPlansDescription')}</p>
-      </div>
+          <h3>{t('noPlans')}</h3>
+          <p>{t('noPlansDescription')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="plan-list">
 
-      {error && (
-        <div className="plan-feedback plan-feedback-error">
-          <span>{error}</span>
-        </div>
-      )}
+      <FeedbackMessage message={error} />
 
       {membershipPlans.map(plan => (
         <article

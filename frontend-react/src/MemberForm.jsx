@@ -289,11 +289,7 @@ function MemberForm({ onMemberCreated }) {
           onSubmit={handleSubmit}
         >
 
-          {errors.general && (
-            <div className="form-error">
-              {errors.general}
-            </div>
-          )}
+          <FeedbackMessage message={errors.general} />
 
           <FeedbackMessage message={lookupError} />
 

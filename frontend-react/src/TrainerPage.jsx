@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import TrainerList from './TrainerList'
 import TrainerForm from './TrainerForm'
-import { Award, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function TrainerPage() {
   const { t } = useTranslation(['people', 'common'])
@@ -58,12 +59,7 @@ function TrainerPage() {
 
       <TrainerForm onTrainerCreated={loadTrainers} />
 
-      {pageError && (
-        <div className="trainer-feedback">
-          <Award size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="trainer-state">

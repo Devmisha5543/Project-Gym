@@ -197,12 +197,7 @@ function AdminForm({ onAdminCreated }) {
 
         </div>
 
-        {submitError && (
-          <div className="admin-feedback admin-form-error">
-            {submitError}
-          </div>
-        )}
-
+        <FeedbackMessage message={submitError} />
         <FeedbackMessage message={successMessage} type="success" />
 
         <div className="admin-form-actions">

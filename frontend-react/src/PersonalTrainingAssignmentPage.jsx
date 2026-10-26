@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import PersonalTrainingAssignmentList from './PersonalTrainingAssignmentList'
 import PersonalTrainingAssignmentForm from './PersonalTrainingAssignmentForm'
-import { Activity, Receipt } from 'lucide-react'
+import { Activity } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function PersonalTrainingAssignmentPage() {
   const { t } = useTranslation(['people', 'common'])
@@ -58,12 +59,7 @@ function PersonalTrainingAssignmentPage() {
 
       <PersonalTrainingAssignmentForm onPersonalTrainingAssignmentCreated={loadPersonalTrainingAssignments} />
 
-      {pageError && (
-        <div className="pt-assignment-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="pt-assignment-state">

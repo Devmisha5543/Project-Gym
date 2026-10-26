@@ -4,6 +4,8 @@ import { Boxes, MapPin, ShieldCheck, Pencil, Trash2, Save, X } from 'lucide-reac
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import { equipmentSchema } from './schemas'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function EquipmentList({ equipment, onEquipmentUpdated, onEquipmentDeleted }) {
   const { t } = useTranslation(['equipment', 'common'])
@@ -31,6 +33,7 @@ function EquipmentList({ equipment, onEquipmentUpdated, onEquipmentDeleted }) {
   }
 
   function handleEditChange(field, value) {
+    setError('')
     setEditForm(previous => ({ ...previous, [field]: value }))
   }
 
@@ -69,6 +72,7 @@ function EquipmentList({ equipment, onEquipmentUpdated, onEquipmentDeleted }) {
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('equipmentUpdateFailed'))
       setEditingId(null)
+      notify(t('equipmentUpdated'), 'success')
       onEquipmentUpdated?.()
     } catch (err) {
       console.error('Failed to update equipment:', err)
@@ -86,6 +90,7 @@ function EquipmentList({ equipment, onEquipmentUpdated, onEquipmentDeleted }) {
       const response = await authFetch(`${API_URL}/equipment/${item.equipment_id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('equipmentDeleteFailed'))
+      notify(t('equipmentDeleted'), 'success')
       onEquipmentDeleted?.()
     } catch (err) {
       console.error('Failed to delete equipment:', err)
@@ -95,11 +100,11 @@ function EquipmentList({ equipment, onEquipmentUpdated, onEquipmentDeleted }) {
     }
   }
 
-  if (equipment.length === 0) return <div className="equipment-state"><div className="equipment-state-icon"><Boxes size={25} /></div><h3>{t('noEquipment')}</h3><p>{t('noEquipmentDescription')}</p></div>
+  if (equipment.length === 0) return <><FeedbackMessage message={error} /><div className="equipment-state"><div className="equipment-state-icon"><Boxes size={25} /></div><h3>{t('noEquipment')}</h3><p>{t('noEquipmentDescription')}</p></div></>
 
   return (
     <div className="equipment-list">
-      {error && <div className="equipment-feedback"><span>{error}</span></div>}
+      <FeedbackMessage message={error} />
       {equipment.map(item => (
         <article className="equipment-card" key={item.equipment_id}>
           <div className="equipment-card-icon"><Boxes size={20} /></div>

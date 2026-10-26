@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import ClassList from './ClassList'
 import ClassForm from './ClassForm'
-import { CalendarDays, Receipt } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function ClassPage() {
   const { t } = useTranslation(['classes', 'common'])
@@ -58,12 +59,7 @@ function ClassPage() {
 
       <ClassForm onClassCreated={loadClasses} />
 
-      {pageError && (
-        <div className="class-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="class-state">

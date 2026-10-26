@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import BranchList from './BranchList'
 import BranchForm from './BranchForm'
-import { Building2, MapPinned } from 'lucide-react'
+import { Building2 } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function BranchPage() {
   const { t } = useTranslation(['people', 'common'])
@@ -58,12 +59,7 @@ function BranchPage() {
 
       <BranchForm onBranchCreated={loadBranches} />
 
-      {pageError && (
-        <div className="branch-feedback branch-feedback-error">
-          <MapPinned size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
       {loading ? (
         <div className="branch-state">
           <div className="loading-spinner"></div>

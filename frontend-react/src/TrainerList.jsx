@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
   const { t } = useTranslation(['people', 'common'])
@@ -55,6 +57,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
   }
 
   function handleEditChange(field, value) {
+    setError('')
     setEditForm(prev => ({
       ...prev,
       [field]: value
@@ -109,6 +112,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       }
 
       setEditingId(null)
+      notify(t('trainerUpdated'), 'success')
 
       if (onTrainerUpdated) {
         onTrainerUpdated()
@@ -150,6 +154,7 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
       if (onTrainerDeleted) {
         onTrainerDeleted()
       }
+      notify(t('trainerDeleted'), 'success')
     } catch (err) {
       console.error('Failed to delete trainer:', err)
       setError(err.message || t('trainerDeleteFailed'))
@@ -160,25 +165,24 @@ function TrainerList({ trainers, onTrainerUpdated, onTrainerDeleted }) {
 
   if (trainers.length === 0) {
     return (
-      <div className="trainer-state trainer-empty-state">
-        <div className="trainer-state-icon">
-          <UserRound size={25} />
-        </div>
+      <>
+        <FeedbackMessage message={error} />
+        <div className="trainer-state trainer-empty-state">
+          <div className="trainer-state-icon">
+            <UserRound size={25} />
+          </div>
 
-        <h3>{t('noTrainers')}</h3>
-        <p>{t('addTrainerHelp')}</p>
-      </div>
+          <h3>{t('noTrainers')}</h3>
+          <p>{t('addTrainerHelp')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="trainer-list">
 
-      {error && (
-        <div className="trainer-feedback">
-          <span>{error}</span>
-        </div>
-      )}
+      <FeedbackMessage message={error} />
 
       {trainers.map(trainer => (
         <article

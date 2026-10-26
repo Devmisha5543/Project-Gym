@@ -33,6 +33,7 @@ import { Moon, Sun } from 'lucide-react'
 import { ThemeProvider, useTheme } from './ThemeContext'
 import { FeatureVisibilityProvider, useFeatureVisibility } from './FeatureVisibilityContext'
 import { useTranslation } from 'react-i18next'
+import { FeedbackMessageHost } from './FeedbackMessage'
 
 
 const navigation = [
@@ -223,6 +224,7 @@ function App() {
 
   return (
     <ThemeProvider>
+    <FeedbackMessageHost />
     <FeatureVisibilityProvider>
     <Routes>
 

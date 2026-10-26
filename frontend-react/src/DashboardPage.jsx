@@ -29,6 +29,7 @@ function DashboardPage() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [memberFeedback, setMemberFeedback] = useState(null)
   const [selectedMembership, setSelectedMembership] = useState(null)
   const [branches, setBranches] = useState([])
 
@@ -124,6 +125,7 @@ function DashboardPage() {
       </section>
 
       <FeedbackMessage message={loadError} />
+      <FeedbackMessage message={memberFeedback?.message} type={memberFeedback?.type} />
 
 
       {/* STATISTICS */}
@@ -442,6 +444,7 @@ function DashboardPage() {
                 setSelectedMembership(current => ({ ...current, ...updatedMember, ...updatedDates }))
                 loadDashboard()
               }}
+              onFeedback={(message, type) => setMemberFeedback({ message, type })}
               onMemberDeleted={() => setSelectedMembership(null)}
               onRenew={() => navigate('/payments', { state: { renewalMembershipId: selectedMembership.membership_id } })}
               onClose={() => setSelectedMembership(null)}

@@ -4,7 +4,7 @@ import { API_URL } from './config'
 import { authFetch } from './authFetch'
 import AdminList from './AdminList'
 import AdminForm from './AdminForm'
-import { Receipt, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 
 function AdminPage() {
@@ -129,12 +129,7 @@ function AdminPage() {
 
       <FeedbackMessage message={operationFeedback?.message} type={operationFeedback?.type} />
 
-      {pageError && (
-        <div className="admin-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="admin-state">

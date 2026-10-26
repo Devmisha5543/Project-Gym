@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import EquipmentList from './EquipmentList'
 import EquipmentForm from './EquipmentForm'
-import { Boxes, Receipt } from 'lucide-react'
+import { Boxes } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function EquipmentPage() {
   const { t } = useTranslation(['equipment', 'common'])
@@ -42,12 +43,7 @@ function EquipmentPage() {
         </div>
       </div>
       <EquipmentForm onEquipmentCreated={loadEquipment} />
-      {pageError && (
-        <div className="equipment-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
       {loading ? (
         <div className="equipment-state">
           <div className="loading-spinner"></div>

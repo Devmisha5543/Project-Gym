@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function ClassList({ classes, onClassUpdated, onClassDeleted }) {
   const { t } = useTranslation(['classes', 'common'])
@@ -131,6 +133,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       .then(() => {
         cancelEdit()
         onClassUpdated()
+        notify(t('classUpdated'), 'success')
       })
       .catch(error => {
         console.error('Failed to update class:', error)
@@ -161,6 +164,7 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
       })
       .then(() => {
         onClassDeleted()
+        notify(t('classDeleted'), 'success')
       })
       .catch(error => {
         console.error('Failed to delete class:', error)
@@ -173,24 +177,23 @@ function ClassList({ classes, onClassUpdated, onClassDeleted }) {
 
   if (classes.length === 0) {
     return (
-      <div className="class-state class-empty-state">
-        <div className="class-state-icon">
-          <CalendarDays size={25} />
-        </div>
+      <>
+        <FeedbackMessage message={operationError} />
+        <div className="class-state class-empty-state">
+          <div className="class-state-icon">
+            <CalendarDays size={25} />
+          </div>
 
-        <h3>{t('noClasses')}</h3>
-        <p>{t('noClassesDescription')}</p>
-      </div>
+          <h3>{t('noClasses')}</h3>
+          <p>{t('noClassesDescription')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <>
-      {operationError && (
-        <div className="class-feedback" role="alert">
-          {operationError}
-        </div>
-      )}
+      <FeedbackMessage message={operationError} />
 
       <div className="class-list">
         {classes.map(gymClass => (

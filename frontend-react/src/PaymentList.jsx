@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
   const { t } = useTranslation(['payments', 'common'])
@@ -96,6 +98,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
       })
       .then(() => {
         cancelEditing()
+        notify(t('paymentUpdated'), 'success')
         onPaymentUpdated()
       })
       .catch(error => {
@@ -126,6 +129,7 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
         return data
       })
       .then(() => {
+        notify(t('paymentDeleted'), 'success')
         onPaymentDeleted()
       })
       .catch(error => {
@@ -139,24 +143,23 @@ function PaymentList({ payments, onPaymentUpdated, onPaymentDeleted }) {
 
   if (payments.length === 0) {
     return (
-      <div className="payment-state payment-empty-state">
-        <div className="payment-state-icon">
-          <CreditCard size={25} />
-        </div>
+      <>
+        <FeedbackMessage message={operationError} />
+        <div className="payment-state payment-empty-state">
+          <div className="payment-state-icon">
+            <CreditCard size={25} />
+          </div>
 
-        <h3>{t('noPayments')}</h3>
-        <p>{t('noPaymentsDescription')}</p>
-      </div>
+          <h3>{t('noPayments')}</h3>
+          <p>{t('noPaymentsDescription')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <div className="payment-list">
-      {operationError && (
-        <div className="payment-feedback" role="alert">
-          {operationError}
-        </div>
-      )}
+      <FeedbackMessage message={operationError} />
 
       {payments.map(payment => (
         <article

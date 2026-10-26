@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import TrainerBranchList from './TrainerBranchList'
 import TrainerBranchForm from './TrainerBranchForm'
-import { GitBranch, Receipt } from 'lucide-react'
+import { GitBranch } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 
 function TrainerBranchPage() {
   const { t } = useTranslation(['people', 'common'])
@@ -49,12 +50,7 @@ function TrainerBranchPage() {
         </div>
       </div>
       <TrainerBranchForm onTrainerBranchCreated={loadTrainerBranches} />
-      {pageError && (
-        <div className="trainer-branch-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
       {loading ? (
         <div className="trainer-branch-state">
           <div className="loading-spinner"></div>

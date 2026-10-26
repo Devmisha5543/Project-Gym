@@ -2023,6 +2023,30 @@ html[data-theme="light"] .feedback-message--error {
   color: var(--danger);
 }
 
+html[data-theme="light"] .feedback-message--warning {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+html[data-theme="light"] .feedback-message--info {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+@media (max-width: 768px) {
+  .feedback-message-portal-root {
+    top: max(72px, calc(env(safe-area-inset-top) + 12px));
+    right: max(12px, env(safe-area-inset-right));
+    width: min(420px, calc(100vw - 24px));
+  }
+
+  .feedback-message {
+    margin: 0;
+  }
+}
+
 @media (max-width: 480px) {
   .main-content {
     padding-right: 12px;

@@ -117,7 +117,7 @@ function MemberDetail({
       .then(response => (
         response.json().catch(() => ({})).then(data => {
           if (!response.ok) {
-            throw new Error(t('updateMemberFailed'))
+            throw new Error(data.error || t('updateFailed'))
           }
 
           return data
@@ -132,11 +132,11 @@ function MemberDetail({
 
         onMemberUpdated?.(updatedMember, data.membership)
         cancelEditing()
-        onFeedback?.('Member updated successfully.', 'success')
+        onFeedback?.(t('updated'), 'success')
       })
       .catch(error => {
         console.error('Failed to update member:', error)
-        onFeedback?.('members:updateMemberFailed', 'error')
+        onFeedback?.(error.message || t('updateFailed'), 'error')
       })
       .finally(() => setSaving(false))
   }
@@ -158,7 +158,7 @@ function MemberDetail({
       ))
       .then(() => {
         onMemberDeleted?.(member.member_id)
-        onFeedback?.('Member deleted successfully.', 'success')
+        onFeedback?.(t('deleted'), 'success')
         onClose?.()
       })
       .catch(error => {

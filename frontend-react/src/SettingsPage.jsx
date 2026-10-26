@@ -13,12 +13,12 @@ import {
   MapPin,
   Coins,
   Link as LinkIcon,
-  CheckCircle2,
   AlertCircle,
   RefreshCw
 } from 'lucide-react'
 import { useFeatureVisibility } from './FeatureVisibilityContext'
 import { SIDEBAR_FEATURES } from './featureVisibility'
+import FeedbackMessage from './FeedbackMessage'
 
 function SettingsPage() {
   const { t } = useTranslation(['settings', 'common', 'validation', 'navigation'])
@@ -208,19 +208,8 @@ function SettingsPage() {
       </div>
 
       {/* FEEDBACK MESSAGES */}
-      {submitError && (
-        <div className="settings-feedback-error">
-          <AlertCircle size={17} />
-          <span>{t(submitError === 'networkError' ? 'common:networkError' : submitError)}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div className="settings-feedback-success">
-          <CheckCircle2 size={17} />
-          <span>{t(successMessage)}</span>
-        </div>
-      )}
+      <FeedbackMessage message={submitError && t(submitError === 'networkError' ? 'common:networkError' : submitError)} />
+      <FeedbackMessage message={successMessage && t(successMessage)} type="success" />
 
       <section className="settings-form-section settings-language-section">
         <div className="settings-form-heading">

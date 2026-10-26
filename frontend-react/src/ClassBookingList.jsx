@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { CalendarDays, CalendarCheck, Dumbbell, UserRound, Pencil, Trash2, Save, X } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function asDateTimeInput(value) {
   return value ? String(value).slice(0, 16) : ''
@@ -43,6 +45,7 @@ function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBooking
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('bookingUpdateFailed'))
       setEditingId(null)
+      notify(t('bookingUpdated'), 'success')
       onClassBookingUpdated()
     } catch (err) {
       setError(err.message || t('bookingUpdateFailed'))
@@ -59,6 +62,7 @@ function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBooking
       const response = await authFetch(`${API_URL}/classbookings/${booking.booking_id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('bookingDeleteFailed'))
+      notify(t('bookingDeleted'), 'success')
       onClassBookingDeleted()
     } catch (err) {
       setError(err.message || t('bookingDeleteFailed'))
@@ -69,17 +73,20 @@ function ClassBookingList({ classBookings, onClassBookingUpdated, onClassBooking
 
   if (classBookings.length === 0) {
     return (
-      <div className="class-booking-state">
-        <div className="class-booking-state-icon"><CalendarCheck size={25} /></div>
-        <h3>{t('noBookings')}</h3>
-        <p>{t('noBookingsDescription')}</p>
-      </div>
+      <>
+        <FeedbackMessage message={error} />
+        <div className="class-booking-state">
+          <div className="class-booking-state-icon"><CalendarCheck size={25} /></div>
+          <h3>{t('noBookings')}</h3>
+          <p>{t('noBookingsDescription')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <>
-      {error && <div className="class-booking-feedback" role="alert">{error}</div>}
+      <FeedbackMessage message={error} />
       <div className="class-booking-list">
         {classBookings.map(booking => (
           <article className="class-booking-card" key={booking.booking_id}>

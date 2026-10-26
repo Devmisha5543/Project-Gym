@@ -4,27 +4,32 @@ import { API_URL } from './config'
 import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import GoogleAuthButton from './GoogleAuthButton'
+import FeedbackMessage from './FeedbackMessage'
 
 function ForgotPassword() {
   const { t } = useTranslation('auth')
   const [email, setEmail] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event) {
     event.preventDefault()
     setIsSubmitting(true)
+    setError('')
     try {
-      await fetch(`${API_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
+      if (!response.ok) throw new Error(t('common:networkError'))
+      setSubmitted(true)
     } catch {
-      // Keep the response the same whether or not the address has an account.
+      setError(t('common:networkError'))
+    } finally {
+      setIsSubmitting(false)
     }
-    setSubmitted(true)
-    setIsSubmitting(false)
   }
 
   return (
@@ -35,9 +40,10 @@ function ForgotPassword() {
         <div className="login-brand"><div className="login-brand-mark">PG</div><div><strong>Project Gym</strong><span>{t('managementPlatform')}</span></div></div>
         <div className="login-heading"><ShieldCheck size={20} /><span>{t('accountRecovery')}</span><h1>{t('forgotPasswordTitle')}</h1><p>{t('forgotPasswordDescription')}</p></div>
         {submitted ? (
-          <div className="settings-feedback-success" role="status">{t('resetLinkSent')}</div>
+          <FeedbackMessage message={t('resetLinkSent')} type="success" />
         ) : (
           <form className="login-form" onSubmit={handleSubmit}>
+            <FeedbackMessage message={error} />
             <label className="login-field"><span>{t('emailAddress')}</span><div className="login-input-wrap"><Mail size={17} /><input type="email" value={email} onChange={event => setEmail(event.target.value)} required autoComplete="email" placeholder="you@example.com" /></div></label>
             <button className="login-button" type="submit" disabled={isSubmitting}>{isSubmitting ? t('sending') : t('sendResetLink')}</button>
           </form>

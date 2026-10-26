@@ -4,7 +4,7 @@ import { API_URL } from './config'
 import { useNavigate } from 'react-router-dom'
 import MemberList from './MemberList'
 import MemberForm from './MemberForm'
-import { Search, Users, Building2, Filter, X, AlertCircle, RotateCcw } from 'lucide-react'
+import { Search, Users, Building2, Filter, X } from 'lucide-react'
 import FeedbackMessage from './FeedbackMessage'
 import { useTranslation } from 'react-i18next'
 
@@ -442,27 +442,11 @@ function MembersPage() {
 
 
       {/* API error */}
-      {pageError && (
-  <div className="member-error-state">
-    <div className="member-error-icon">
-      <AlertCircle size={20} />
-    </div>
-
-    <div className="member-error-content">
-      <strong>{t('somethingWentWrong')}</strong>
-      <span>{t(pageError, { defaultValue: t('loadFailed') })}</span>
-    </div>
-
-    <button
-      type="button"
-      className="member-error-retry"
-      onClick={loadMembers}
-    >
-      <RotateCcw size={15} />
-      {t('retry')}
-    </button>
-  </div>
-)}
+      <FeedbackMessage
+        message={pageError && t(pageError, { defaultValue: t('loadFailed') })}
+        actionLabel={t('retry')}
+        onAction={loadMembers}
+      />
 
 
       {/* Members */}

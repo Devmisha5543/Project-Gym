@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useId } from 'react'
 import {
   Activity,
-  AlertCircle,
   ArrowDownRight,
   ArrowUpRight,
   Building2,
@@ -23,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { authFetch } from './authFetch'
 import { API_URL } from './config'
 import { useGym } from './GymContext'
+import FeedbackMessage from './FeedbackMessage'
 import './AnalyticsPage.css'
 
 const endpoints = ['overview', 'retention', 'financial', 'memberships', 'growth', 'branches']
@@ -317,31 +317,7 @@ export default function AnalyticsPage() {
       {/* ============================================================
           ERROR BANNER
           ============================================================ */}
-      <AnimatePresence>
-        {error && (
-          <motion.div
-            className="analytics-error-banner"
-            role="alert"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={snappy}
-          >
-            <div className="analytics-error-left">
-              <AlertCircle size={18} />
-              <span>{error}</span>
-            </div>
-            <button
-              type="button"
-              className="analytics-error-retry-btn"
-              onClick={loadAnalytics}
-            >
-              <RefreshCw size={12} />
-              <span>{t('tryAgain')}</span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <FeedbackMessage message={error} actionLabel={t('tryAgain')} onAction={loadAnalytics} />
 
       {/* ============================================================
           LOADING SKELETON OR CONTENT

@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { API_URL } from './config'
 import PaymentList from './PaymentList'
 import PaymentForm from './PaymentForm'
-import { CreditCard, Receipt } from 'lucide-react'
+import { CreditCard } from 'lucide-react'
+import FeedbackMessage from './FeedbackMessage'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function PaymentPage() {
@@ -76,12 +77,7 @@ function PaymentPage() {
         onRenewalComplete={() => navigate('/dashboard', { replace: true })}
       />
 
-      {pageError && (
-        <div className="payment-feedback">
-          <Receipt size={17} />
-          <span>{pageError}</span>
-        </div>
-      )}
+      <FeedbackMessage message={pageError} />
 
       {loading ? (
         <div className="payment-state">

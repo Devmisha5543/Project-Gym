@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Activity, CalendarDays, Dumbbell, UserRound, Pencil, Trash2, Save, X } from 'lucide-react'
 import { API_URL } from './config'
 import { authFetch } from './authFetch'
+import FeedbackMessage from './FeedbackMessage'
+import { notify } from './notifications'
 
 function PersonalTrainingAssignmentList({ personalTrainingAssignments, onAssignmentUpdated, onAssignmentDeleted }) {
   const { t } = useTranslation(['people', 'common'])
@@ -37,6 +39,7 @@ function PersonalTrainingAssignmentList({ personalTrainingAssignments, onAssignm
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('assignmentUpdateFailed'))
       setEditingId(null)
+      notify(t('assignmentUpdated'), 'success')
       onAssignmentUpdated()
     } catch (err) {
       setError(err.message || t('assignmentUpdateFailed'))
@@ -53,6 +56,7 @@ function PersonalTrainingAssignmentList({ personalTrainingAssignments, onAssignm
       const response = await authFetch(`${API_URL}/personaltrainingassignments/${assignment.assignment_id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || t('assignmentDeleteFailed'))
+      notify(t('assignmentDeleted'), 'success')
       onAssignmentDeleted()
     } catch (err) {
       setError(err.message || t('assignmentDeleteFailed'))
@@ -63,17 +67,20 @@ function PersonalTrainingAssignmentList({ personalTrainingAssignments, onAssignm
 
   if (personalTrainingAssignments.length === 0) {
     return (
-      <div className="pt-assignment-state pt-assignment-empty-state">
-        <div className="pt-assignment-state-icon"><Activity size={25} /></div>
-        <h3>{t('noAssignments')}</h3>
-        <p>{t('createAssignment')}</p>
-      </div>
+      <>
+        <FeedbackMessage message={error} />
+        <div className="pt-assignment-state pt-assignment-empty-state">
+          <div className="pt-assignment-state-icon"><Activity size={25} /></div>
+          <h3>{t('noAssignments')}</h3>
+          <p>{t('createAssignment')}</p>
+        </div>
+      </>
     )
   }
 
   return (
     <>
-      {error && <div className="pt-assignment-feedback" role="alert">{error}</div>}
+      <FeedbackMessage message={error} />
       <div className="pt-assignment-list">
         {personalTrainingAssignments.map(assignment => (
           <article className="pt-assignment-card" key={assignment.assignment_id}>
