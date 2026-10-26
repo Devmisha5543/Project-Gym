@@ -42,7 +42,8 @@ function buildTrainerSchema() {
 function buildMembershipPlanSchema() {
   return z.object({
     planName: z.string().min(2, getMsg('nameMin', { count: 2 }, 'Name must be at least 2 characters')),
-    price: z.coerce.number().positive(getMsg('positiveNumber', {}, 'Price must be greater than 0'))
+    price: z.coerce.number().positive(getMsg('positiveNumber', {}, 'Price must be greater than 0')),
+    durationDays: z.coerce.number().int().positive(getMsg('positiveInteger', {}, 'Duration must be a positive whole number'))
   })
 }
 

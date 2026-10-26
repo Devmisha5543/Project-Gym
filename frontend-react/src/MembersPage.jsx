@@ -72,10 +72,17 @@ function MembersPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [mobileFilterOpen])
 
-  function handleMemberUpdated(updatedMember) {
+  function handleMemberUpdated(updatedMember, updatedMembership) {
     setMembers(currentMembers => currentMembers.map(member => (
       String(member.member_id) === String(updatedMember.member_id) ? updatedMember : member
     )))
+    if (updatedMembership) {
+      setMemberships(current => current.map(membership => (
+        String(membership.membership_id) === String(updatedMembership.membership_id)
+          ? { ...membership, ...updatedMembership }
+          : membership
+      )))
+    }
   }
 
   function handleMemberDeleted(memberId) {

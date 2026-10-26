@@ -121,14 +121,6 @@ function MemberForm({ onMemberCreated }) {
     setErrors({})
   }
 
-  function calculateMembershipEndDate(startDate) {
-    const date = new Date(`${startDate}T00:00:00`)
-
-    date.setDate(date.getDate() + 30)
-
-    return date.toISOString().split('T')[0]
-  }
-
   async function handleSubmit(event) {
     event.preventDefault()
 
@@ -209,8 +201,6 @@ function MemberForm({ onMemberCreated }) {
       formData.append('join_date', joinDate)
       formData.append('wants_trainer', wantsTrainer)
       formData.append('plan_id', planId)
-      formData.append('membership_end_date', calculateMembershipEndDate(joinDate))
-
       if (photo) {
         formData.append('photo', photo)
       }

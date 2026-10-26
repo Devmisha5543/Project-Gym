@@ -438,7 +438,10 @@ function DashboardPage() {
               member={selectedMembership}
               branches={branches}
               membership={selectedMembership}
-              onMemberUpdated={updatedMember => setSelectedMembership(current => ({ ...current, ...updatedMember }))}
+              onMemberUpdated={(updatedMember, updatedDates) => {
+                setSelectedMembership(current => ({ ...current, ...updatedMember, ...updatedDates }))
+                loadDashboard()
+              }}
               onMemberDeleted={() => setSelectedMembership(null)}
               onRenew={() => navigate('/payments', { state: { renewalMembershipId: selectedMembership.membership_id } })}
               onClose={() => setSelectedMembership(null)}

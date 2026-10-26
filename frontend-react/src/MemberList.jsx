@@ -135,9 +135,9 @@ function MemberList({ members, memberships = [], branches, onMemberUpdated, onMe
                   .sort((a, b) => String(b.end_date || '').localeCompare(String(a.end_date || '')) || Number(b.membership_id) - Number(a.membership_id))[0]
                 if (membership) onRenew?.(membership)
               }}
-              onMemberUpdated={updated => {
+              onMemberUpdated={(updated, updatedMembership) => {
                 setSelectedMember(updated)
-                onMemberUpdated?.(updated)
+                onMemberUpdated?.(updated, updatedMembership)
               }}
               onMemberDeleted={memberId => {
                 setSelectedMember(null)

@@ -998,7 +998,7 @@ def get_members():
             "gender": row[3],
             "phone": row[4],
             "address": row[5],
-            "join_date": row[6],
+            "join_date": row[6].isoformat() if row[6] else None,
             "wants_trainer": row[7],
             "photo_filename": available_member_photo(row[8])
         })
@@ -1031,7 +1031,6 @@ def create_member():
         "join_date",
         "wants_trainer",
         "plan_id",
-        "membership_end_date"
     ]
 
     missing = [field for field in required_fields if field not in data]
@@ -1064,6 +1063,12 @@ def create_member():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
+        cursor.execute("SELECT duration_days FROM MembershipPlan WHERE plan_id = %s;", (data["plan_id"],))
+        plan = cursor.fetchone()
+        if plan is None:
+            return jsonify({"error": "Membership plan not found"}), 404
+        join_date = datetime.date.fromisoformat(data["join_date"])
+        membership_end_date = join_date + datetime.timedelta(days=plan[0])
         cursor.execute(
             "SELECT 1 FROM branch WHERE branch_id = %s AND gym_id = %s;",
             (data["branch_id"], request.decoded_token.get("gym_id"))
@@ -1091,7 +1096,7 @@ def create_member():
             VALUES (%s, %s, %s, %s, 'active')
             RETURNING membership_id;
             """,
-            (new_id, data["plan_id"], data["join_date"], data["membership_end_date"])
+            (new_id, data["plan_id"], join_date, membership_end_date)
         )
         membership_id = cursor.fetchone()[0]
         conn.commit()
@@ -1248,13 +1253,14 @@ def update_member(member_id):
             cursor.execute(
                 """
                 UPDATE Member
-                SET name = %s, phone = %s
+                SET name = %s, phone = %s, join_date = COALESCE(%s, join_date)
                 WHERE member_id = %s
                   AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
                 """,
                 (
                     data["name"],
                     data["phone"],
+                    data.get("join_date"),
                     member_id,
                     request.decoded_token.get("gym_id")
                 )
@@ -1320,6 +1326,24 @@ def update_member(member_id):
                 "error": f"Member {member_id} not found"
             }), 404
 
+        membership_dates = None
+        if "join_date" in data:
+            cursor.execute(
+                "SELECT ms.membership_id, mp.duration_days FROM Membership ms "
+                "JOIN MembershipPlan mp ON mp.plan_id = ms.plan_id "
+                "WHERE ms.member_id = %s ORDER BY ms.end_date DESC, ms.membership_id DESC "
+                "LIMIT 1 FOR UPDATE OF ms;",
+                (member_id,)
+            )
+            current_membership = cursor.fetchone()
+            if current_membership:
+                start_date = datetime.date.fromisoformat(data["join_date"])
+                end_date = start_date + datetime.timedelta(days=current_membership[1])
+                cursor.execute(
+                    "UPDATE Membership SET start_date = %s, end_date = %s WHERE membership_id = %s;",
+                    (start_date, end_date, current_membership[0])
+                )
+                membership_dates = {"membership_id": current_membership[0], "start_date": start_date.isoformat(), "end_date": end_date.isoformat()}
         conn.commit()
 
         cursor.execute(
@@ -1355,10 +1379,11 @@ def update_member(member_id):
             "gender": row[3],
             "phone": row[4],
             "address": row[5],
-            "join_date": row[6],
+            "join_date": row[6].isoformat() if row[6] else None,
             "wants_trainer": row[7],
             "photo_filename": row[8]
-        }
+        },
+        "membership": membership_dates
     }), 200
 
 @app.route("/trainers")
@@ -1506,8 +1531,7 @@ def get_expiring_memberships():
                 ON membership.member_id = member.member_id
             JOIN branch tenant_branch
                 ON tenant_branch.branch_id = member.branch_id
-            WHERE membership.end_date >= CURRENT_DATE
-              AND membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
+            WHERE membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
               AND membership.status <> 'cancelled'
               AND tenant_branch.gym_id = %s
               AND NOT EXISTS (
@@ -1557,7 +1581,7 @@ def create_membership():
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    required_fields = ["member_id", "plan_id", "start_date", "end_date", "status"]
+    required_fields = ["member_id", "plan_id", "start_date", "status"]
     missing = [field for field in required_fields if field not in data]
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
@@ -1565,6 +1589,13 @@ def create_membership():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        cursor.execute("SELECT duration_days FROM MembershipPlan WHERE plan_id = %s;", (data["plan_id"],))
+        plan = cursor.fetchone()
+        if plan is None:
+            conn.rollback()
+            return jsonify({"error": "Membership plan not found"}), 404
+        start_date = datetime.date.fromisoformat(data["start_date"])
+        end_date = start_date + datetime.timedelta(days=plan[0])
         cursor.execute(
             "SELECT 1 FROM member m JOIN branch b ON b.branch_id = m.branch_id "
             "WHERE m.member_id = %s AND b.gym_id = %s;",
@@ -1575,9 +1606,17 @@ def create_membership():
             return jsonify({"error": "Member not found"}), 404
         cursor.execute(
             "INSERT INTO Membership (member_id, plan_id, start_date, end_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING membership_id;",
-            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"])
+            (data["member_id"], data["plan_id"], start_date, end_date, data["status"])
         )
         new_id = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT membership_id FROM Membership WHERE member_id = %s "
+            "ORDER BY end_date DESC, membership_id DESC LIMIT 1;",
+            (data["member_id"],)
+        )
+        current_membership = cursor.fetchone()
+        if current_membership and current_membership[0] == new_id:
+            cursor.execute("UPDATE Member SET join_date = %s WHERE member_id = %s;", (start_date, data["member_id"]))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1629,16 +1668,31 @@ def update_membership(membership_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        cursor.execute("SELECT duration_days FROM MembershipPlan WHERE plan_id = %s;", (data["plan_id"],))
+        plan = cursor.fetchone()
+        if plan is None:
+            conn.rollback()
+            return jsonify({"error": "Membership plan not found"}), 404
+        start_date = datetime.date.fromisoformat(data["start_date"])
+        end_date = start_date + datetime.timedelta(days=plan[0])
         cursor.execute(
             "UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s "
             "WHERE membership_id = %s AND member_id IN "
             "(SELECT m.member_id FROM member m JOIN branch b ON b.branch_id = m.branch_id WHERE b.gym_id = %s);",
-            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"],
+            (data["member_id"], data["plan_id"], start_date, end_date,
              data["status"], membership_id, request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Membership {membership_id} not found"}), 404
+        cursor.execute(
+            "SELECT membership_id FROM Membership WHERE member_id = %s "
+            "ORDER BY end_date DESC, membership_id DESC LIMIT 1 FOR UPDATE;",
+            (data["member_id"],)
+        )
+        current_membership = cursor.fetchone()
+        if current_membership and current_membership[0] == membership_id:
+            cursor.execute("UPDATE Member SET join_date = %s WHERE member_id = %s;", (start_date, data["member_id"]))
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1648,7 +1702,7 @@ def update_membership(membership_id):
         conn.close()
 
     invalidate_memberships_cache()
-    return jsonify({"message": f"Membership {membership_id} updated"}), 200
+    return jsonify({"message": f"Membership {membership_id} updated", "start_date": start_date.isoformat(), "end_date": end_date.isoformat()}), 200
 
 @app.route("/personaltrainingassignments")
 @token_required
@@ -2035,7 +2089,8 @@ def create_payment():
         new_id = cursor.fetchone()[0]
         if data.get("renewal"):
             cursor.execute(
-                "UPDATE Membership SET end_date = GREATEST(end_date, CURRENT_DATE) + 30, status = 'active' WHERE membership_id = %s;",
+                "UPDATE Membership ms SET end_date = GREATEST(ms.end_date, CURRENT_DATE) + mp.duration_days, status = 'active' "
+                "FROM MembershipPlan mp WHERE ms.plan_id = mp.plan_id AND ms.membership_id = %s;",
                 (data["membership_id"],)
             )
         conn.commit()
@@ -2368,8 +2423,8 @@ def get_memberships():
             "plan_id": row[3],
             "plan_name": row[4],
             "price": row[5],
-            "start_date": row[6],
-            "end_date": row[7],
+            "start_date": row[6].isoformat() if row[6] else None,
+            "end_date": row[7].isoformat() if row[7] else None,
             "status": row[8]
         })
 
@@ -2383,7 +2438,7 @@ def get_membership_plans():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-            SELECT plan_id, plan_name, price, perks
+            SELECT plan_id, plan_name, price, perks, duration_days
             FROM membershipplan;
         """)
 
@@ -2399,7 +2454,8 @@ def get_membership_plans():
             "plan_id": row[0],
             "plan_name": row[1],
             "price": row[2],
-            "perks": row[3]
+            "perks": row[3],
+            "duration_days": row[4]
         })
 
     return jsonify(plans)
@@ -2871,12 +2927,19 @@ def create_membership_plan():
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
 
+    try:
+        duration_days = int(data.get("duration_days", 30))
+        if duration_days < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "duration_days must be a positive whole number"}), 400
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO MembershipPlan (plan_name, price, perks) VALUES (%s, %s, %s) RETURNING plan_id;",
-            (data["plan_name"], data["price"], data["perks"])
+            "INSERT INTO MembershipPlan (plan_name, price, perks, duration_days) VALUES (%s, %s, %s, %s) RETURNING plan_id;",
+            (data["plan_name"], data["price"], data["perks"], duration_days)
         )
         new_id = cursor.fetchone()[0]
         conn.commit()
@@ -2924,12 +2987,21 @@ def update_membership_plan(plan_id):
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
+    duration_days = data.get("duration_days")
+    if duration_days is not None:
+        try:
+            duration_days = int(duration_days)
+            if duration_days < 1:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": "duration_days must be a positive whole number"}), 400
+
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE MembershipPlan SET plan_name = %s, price = %s, perks = %s WHERE plan_id = %s;",
-            (data["plan_name"], data["price"], data["perks"], plan_id)
+            "UPDATE MembershipPlan SET plan_name = %s, price = %s, perks = %s, duration_days = COALESCE(%s, duration_days) WHERE plan_id = %s;",
+            (data["plan_name"], data["price"], data["perks"], duration_days, plan_id)
         )
         if cursor.rowcount == 0:
             conn.rollback()

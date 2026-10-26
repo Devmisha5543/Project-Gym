@@ -130,7 +130,7 @@ function MemberDetail({
           photo_filename: newPhoto ? newPhoto.name : member.photo_filename
         }
 
-        onMemberUpdated?.(updatedMember)
+        onMemberUpdated?.(updatedMember, data.membership)
         cancelEditing()
         onFeedback?.('Member updated successfully.', 'success')
       })

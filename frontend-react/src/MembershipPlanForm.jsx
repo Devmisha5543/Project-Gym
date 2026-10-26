@@ -11,6 +11,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
   const [planName, setPlanName] = useState('')
   const [price, setPrice] = useState('')
   const [perks, setPerks] = useState('')
+  const [durationDays, setDurationDays] = useState('30')
   const [errors, setErrors] = useState({})
   const [feedback, setFeedback] = useState(null)
   const [submitting, setSubmitting] = useState(false)
@@ -18,7 +19,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
   function handleSubmit(event) {
     event.preventDefault()
 
-    const result = membershipPlanSchema.safeParse({ planName, price })
+    const result = membershipPlanSchema.safeParse({ planName, price, durationDays })
     if (!result.success) {
       const fieldErrors = {}
       result.error.issues.forEach(issue => {
@@ -34,7 +35,8 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
     const newPlan = {
       plan_name: planName,
       price,
-      perks
+      perks,
+      duration_days: durationDays
     }
 
     authFetch(`${API_URL}/membershipplans`, {
@@ -51,6 +53,7 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
         setPlanName('')
         setPrice('')
         setPerks('')
+        setDurationDays('30')
         onMembershipPlanCreated()
         setFeedback({ type: 'success', message: t('planCreated') })
       })
@@ -79,6 +82,13 @@ function MembershipPlanForm({ onMembershipPlanCreated }) {
               <input type="text" value={planName} onChange={e => setPlanName(e.target.value)} required placeholder={t('planNamePlaceholder')} />
             </div>
             {errors.planName && <small className="plan-field-error">{errors.planName}</small>}
+          </label>
+
+          <label className="plan-field">
+            <span>{t('durationDays', { defaultValue: 'Duration in days' })}</span>
+            <div className="plan-input-wrap">
+              <input type="number" min="1" step="1" value={durationDays} onChange={e => setDurationDays(e.target.value)} required />
+            </div>
           </label>
 
           <label className="plan-field">

@@ -23,7 +23,8 @@ function MembershipPlanList({
   const [editForm, setEditForm] = useState({
     plan_name: '',
     price: '',
-    perks: ''
+    perks: '',
+    duration_days: 30
   })
 
   const [saving, setSaving] = useState(false)
@@ -36,7 +37,8 @@ function MembershipPlanList({
     setEditForm({
       plan_name: plan.plan_name || '',
       price: plan.price ?? '',
-      perks: plan.perks || ''
+      perks: plan.perks || '',
+      duration_days: plan.duration_days || 30
     })
 
     setError('')
@@ -48,7 +50,8 @@ function MembershipPlanList({
     setEditForm({
       plan_name: '',
       price: '',
-      perks: ''
+      perks: '',
+      duration_days: 30
     })
 
     setError('')
@@ -91,7 +94,8 @@ function MembershipPlanList({
           body: JSON.stringify({
             plan_name: editForm.plan_name.trim(),
             price: editForm.price,
-            perks: editForm.perks.trim()
+            perks: editForm.perks.trim(),
+            duration_days: Number(editForm.duration_days)
           })
         }
       )
@@ -220,6 +224,13 @@ function MembershipPlanList({
                       }
                       disabled={saving}
                     />
+                  </div>
+                </label>
+
+                <label className="plan-field">
+                  <span>{t('durationDays', { defaultValue: 'Duration in days' })}</span>
+                  <div className="plan-input-wrap">
+                    <input type="number" min="1" step="1" value={editForm.duration_days} onChange={e => handleEditChange('duration_days', e.target.value)} disabled={saving} />
                   </div>
                 </label>
 
