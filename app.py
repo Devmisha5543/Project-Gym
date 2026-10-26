@@ -41,7 +41,11 @@ except redis.RedisError as e:
 
 def invalidate_members_cache():
     try:
-        redis_client.delete("members:all")
+        gym_id = getattr(request, "decoded_token", {}).get("gym_id") if has_request_context() else None
+        keys = ["members:all"]
+        if gym_id is not None:
+            keys.append(f"members:all:{gym_id}")
+        redis_client.delete(*keys)
         print("Members cache invalidated")
     except redis.RedisError as e:
         app.logger.warning("Cache invalidation failed for members:all: %s", e)
@@ -63,6 +67,9 @@ def cache_response(cache_key):
         @wraps(f)
         def decorated(*args, **kwargs):
             key = cache_key() if callable(cache_key) else cache_key
+            gym_id = getattr(request, "decoded_token", {}).get("gym_id")
+            if gym_id is not None and not str(key).startswith("analytics:"):
+                key = f"{key}:{gym_id}"
             try:
                 cached = redis_client.get(key)
             except redis.RedisError:
@@ -91,7 +98,11 @@ def invalidate_caches(*keys):
     if not keys:
         return
     try:
-        redis_client.delete(*keys)
+        gym_id = getattr(request, "decoded_token", {}).get("gym_id") if has_request_context() else None
+        scoped_keys = list(keys)
+        if gym_id is not None:
+            scoped_keys.extend(f"{key}:{gym_id}" for key in keys)
+        redis_client.delete(*scoped_keys)
     except redis.RedisError as e:
         app.logger.warning("Cache invalidation failed for keys %s: %s", keys, e)
 
@@ -186,10 +197,14 @@ def token_required(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"error": "Missing or invalid authorization header"}), 401
+        token = None
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+        elif request.cookies.get("access_token"):
+            token = request.cookies.get("access_token")
 
-        token = auth_header.split(" ")[1]
+        if not token:
+            return jsonify({"error": "Missing or invalid authorization header"}), 401
 
         try:
             decoded = jwt.decode(token, os.getenv("JWT_SECRET"), algorithms=["HS256"])
@@ -388,7 +403,7 @@ def _create_admin_token(admin_id, gym_id):
 
 def _oauth_callback_redirect(config, **params):
     callback_url = f"{config['frontend_url'].rstrip('/')}/oauth/callback"
-    return redirect(f"{callback_url}?{urlencode(params)}")
+    return redirect(f"{callback_url}#{urlencode(params)}")
 
 
 @app.route("/auth/google/start")
@@ -931,7 +946,7 @@ def update_branch(branch_id):
 @app.route("/members")
 @token_required
 def get_members():
-    cache_key = "members:all"
+    cache_key = f"members:all:{request.decoded_token.get('gym_id')}"
 
     # 1. Try Redis first, but never let Redis failure break the API
     try:
@@ -959,10 +974,13 @@ def get_members():
 
     try:
         cursor.execute("""
-            SELECT member_id, branch_id, name, gender, phone, address,
+            SELECT member.member_id, member.branch_id, member.name, member.gender,
+                   member.phone, member.address,
                    join_date, wants_trainer, photo_filename
-            FROM member;
-        """)
+            FROM member
+            JOIN branch ON branch.branch_id = member.branch_id
+            WHERE branch.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"),))
 
         rows = cursor.fetchall()
 
@@ -1047,6 +1065,12 @@ def create_member():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
+            "SELECT 1 FROM branch WHERE branch_id = %s AND gym_id = %s;",
+            (data["branch_id"], request.decoded_token.get("gym_id"))
+        )
+        if cursor.fetchone() is None:
+            return jsonify({"error": "Branch not found"}), 404
+        cursor.execute(
             """
             INSERT INTO Member
             (branch_id, name, gender, phone, address, join_date,
@@ -1108,24 +1132,33 @@ def delete_member(member_id):
     try:
         cursor.execute(
             "DELETE FROM Payment WHERE membership_id IN "
-            "(SELECT membership_id FROM Membership WHERE member_id = %s);",
-            (member_id,)
+            "(SELECT membership_id FROM Membership WHERE member_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND b.gym_id = %s);",
+            (member_id, member_id, request.decoded_token.get("gym_id"))
         )
         cursor.execute(
-            "DELETE FROM Membership WHERE member_id = %s;",
-            (member_id,)
+            "DELETE FROM Membership WHERE member_id = %s AND EXISTS "
+            "(SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND b.gym_id = %s);",
+            (member_id, member_id, request.decoded_token.get("gym_id"))
         )
         cursor.execute(
-            "DELETE FROM ClassBooking WHERE member_id = %s;",
-            (member_id,)
+            "DELETE FROM ClassBooking WHERE member_id = %s AND EXISTS "
+            "(SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND b.gym_id = %s);",
+            (member_id, member_id, request.decoded_token.get("gym_id"))
         )
         cursor.execute(
-            "DELETE FROM PersonalTrainingAssignment WHERE member_id = %s;",
-            (member_id,)
+            "DELETE FROM PersonalTrainingAssignment WHERE member_id = %s AND EXISTS "
+            "(SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND b.gym_id = %s);",
+            (member_id, member_id, request.decoded_token.get("gym_id"))
         )
         cursor.execute(
-            "DELETE FROM Member WHERE member_id = %s;",
-            (member_id,)
+            "DELETE FROM Member WHERE member_id = %s AND branch_id IN "
+            "(SELECT branch_id FROM Branch WHERE gym_id = %s);",
+            (member_id, request.decoded_token.get("gym_id"))
         )
 
         if cursor.rowcount == 0:
@@ -1216,12 +1249,14 @@ def update_member(member_id):
                 """
                 UPDATE Member
                 SET name = %s, phone = %s
-                WHERE member_id = %s;
+                WHERE member_id = %s
+                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
                 """,
                 (
                     data["name"],
                     data["phone"],
-                    member_id
+                    member_id,
+                    request.decoded_token.get("gym_id")
                 )
             )
         elif photo_filename:
@@ -1236,7 +1271,8 @@ def update_member(member_id):
                     join_date = %s,
                     wants_trainer = %s,
                     photo_filename = %s
-                WHERE member_id = %s;
+                WHERE member_id = %s
+                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
                 """,
                 (
                     data["branch_id"],
@@ -1247,7 +1283,8 @@ def update_member(member_id):
                     data["join_date"],
                     str(data["wants_trainer"]).lower() == "true",
                     photo_filename,
-                    member_id
+                    member_id,
+                    request.decoded_token.get("gym_id")
                 )
             )
         else:
@@ -1261,7 +1298,8 @@ def update_member(member_id):
                     address = %s,
                     join_date = %s,
                     wants_trainer = %s
-                WHERE member_id = %s;
+                WHERE member_id = %s
+                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
                 """,
                 (
                     data["branch_id"],
@@ -1271,7 +1309,8 @@ def update_member(member_id):
                     data["address"],
                     data["join_date"],
                     str(data["wants_trainer"]).lower() == "true",
-                    member_id
+                    member_id,
+                    request.decoded_token.get("gym_id")
                 )
             )
 
@@ -1288,9 +1327,10 @@ def update_member(member_id):
             SELECT member_id, branch_id, name, gender, phone, address,
                    join_date, wants_trainer, photo_filename
             FROM member
-            WHERE member_id = %s;
+            WHERE member_id = %s
+              AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
             """,
-            (member_id,)
+            (member_id, request.decoded_token.get("gym_id"))
         )
 
         row = cursor.fetchone()
@@ -1464,9 +1504,12 @@ def get_expiring_memberships():
             FROM membership
             JOIN member
                 ON membership.member_id = member.member_id
+            JOIN branch tenant_branch
+                ON tenant_branch.branch_id = member.branch_id
             WHERE membership.end_date >= CURRENT_DATE
               AND membership.end_date <= CURRENT_DATE + INTERVAL '7 days'
               AND membership.status <> 'cancelled'
+              AND tenant_branch.gym_id = %s
               AND NOT EXISTS (
                   SELECT 1
                   FROM membership newer
@@ -1476,7 +1519,7 @@ def get_expiring_memberships():
                              AND newer.membership_id > membership.membership_id))
               )
             ORDER BY membership.end_date ASC;
-        """)
+        """, (request.decoded_token.get("gym_id"),))
 
         rows = cursor.fetchall()
     finally:
@@ -1523,6 +1566,14 @@ def create_membership():
     cursor = conn.cursor()
     try:
         cursor.execute(
+            "SELECT 1 FROM member m JOIN branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND b.gym_id = %s;",
+            (data["member_id"], request.decoded_token.get("gym_id"))
+        )
+        if cursor.fetchone() is None:
+            conn.rollback()
+            return jsonify({"error": "Member not found"}), 404
+        cursor.execute(
             "INSERT INTO Membership (member_id, plan_id, start_date, end_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING membership_id;",
             (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"])
         )
@@ -1544,7 +1595,12 @@ def delete_membership(membership_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Membership WHERE membership_id = %s;", (membership_id,))
+        cursor.execute(
+            "DELETE FROM Membership WHERE membership_id = %s AND member_id IN "
+            "(SELECT m.member_id FROM member m JOIN branch b ON b.branch_id = m.branch_id "
+            "WHERE b.gym_id = %s);",
+            (membership_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Membership {membership_id} not found"}), 404
@@ -1574,8 +1630,11 @@ def update_membership(membership_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s WHERE membership_id = %s;",
-            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"], data["status"], membership_id)
+            "UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s "
+            "WHERE membership_id = %s AND member_id IN "
+            "(SELECT m.member_id FROM member m JOIN branch b ON b.branch_id = m.branch_id WHERE b.gym_id = %s);",
+            (data["member_id"], data["plan_id"], data["start_date"], data["end_date"],
+             data["status"], membership_id, request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -2286,10 +2345,13 @@ def get_memberships():
             FROM membership m
             JOIN member mem
                 ON m.member_id = mem.member_id
+            JOIN branch tenant_branch
+                ON tenant_branch.branch_id = mem.branch_id
             JOIN membershipplan mp
                 ON m.plan_id = mp.plan_id
+            WHERE tenant_branch.gym_id = %s
             ORDER BY m.membership_id;
-        """)
+        """, (request.decoded_token.get("gym_id"),))
 
         rows = cursor.fetchall()
     finally:
@@ -2893,8 +2955,9 @@ def get_admins():
         cursor.execute("""
             SELECT admin_id, name, email, phone
             FROM Admin
+            WHERE gym_id = %s
             ORDER BY admin_id ASC;
-        """)
+        """, (request.decoded_token.get("gym_id"),))
 
         rows = cursor.fetchall()
     finally:
@@ -2943,15 +3006,16 @@ def create_admin():
         cursor.execute(
             """
             INSERT INTO Admin
-            (name, email, phone, password_hash)
-            VALUES (%s, %s, %s, %s)
+            (name, email, phone, password_hash, gym_id)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING admin_id;
             """,
             (
                 data["name"],
                 data["email"],
                 data["phone"],
-                password_hash
+                password_hash,
+                request.decoded_token.get("gym_id")
             )
         )
 
@@ -3006,14 +3070,15 @@ def update_admin(admin_id):
                     email = %s,
                     phone = %s,
                     password_hash = %s
-                WHERE admin_id = %s;
+                WHERE admin_id = %s AND gym_id = %s;
                 """,
                 (
                     data["name"],
                     data["email"],
                     data["phone"],
                     password_hash,
-                    admin_id
+                    admin_id,
+                    request.decoded_token.get("gym_id")
                 )
             )
 
@@ -3024,13 +3089,14 @@ def update_admin(admin_id):
                 SET name = %s,
                     email = %s,
                     phone = %s
-                WHERE admin_id = %s;
+                WHERE admin_id = %s AND gym_id = %s;
                 """,
                 (
                     data["name"],
                     data["email"],
                     data["phone"],
-                    admin_id
+                    admin_id,
+                    request.decoded_token.get("gym_id")
                 )
             )
 
@@ -3076,8 +3142,8 @@ def delete_admin(admin_id):
     try:
         # Make sure the admin exists
         cursor.execute(
-            "SELECT admin_id FROM Admin WHERE admin_id = %s;",
-            (admin_id,)
+            "SELECT admin_id FROM Admin WHERE admin_id = %s AND gym_id = %s;",
+            (admin_id, request.decoded_token.get("gym_id"))
         )
 
         admin = cursor.fetchone()
@@ -3097,8 +3163,8 @@ def delete_admin(admin_id):
             }), 400
 
         cursor.execute(
-            "DELETE FROM Admin WHERE admin_id = %s;",
-            (admin_id,)
+            "DELETE FROM Admin WHERE admin_id = %s AND gym_id = %s;",
+            (admin_id, request.decoded_token.get("gym_id"))
         )
 
         conn.commit()

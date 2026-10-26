@@ -2,6 +2,7 @@ export default {
   managementPlatform: 'Management platform',
   secureAdminAccess: 'SECURE ADMIN ACCESS',
   welcomeBack: 'Welcome back',
+  Login: 'Login',
   loginDescription: 'Sign in to manage your gym operations.',
   emailAddress: 'Email address',
   password: 'Password',

@@ -8,7 +8,7 @@ function OAuthCallback() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     const token = params.get('token')
     const name = params.get('name')
     const oauthError = params.get('error')

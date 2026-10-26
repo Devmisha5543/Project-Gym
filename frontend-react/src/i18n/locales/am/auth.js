@@ -2,6 +2,7 @@ export default {
   managementPlatform: 'የአስተዳደር መድረክ',
   secureAdminAccess: 'የአስተዳዳሪ ደህንነቱ የተጠበቀ መግቢያ',
   welcomeBack: 'እንኳን በደህና ተመለሱ',
+  Login: 'መግቢያ',
   loginDescription: 'የጂምዎን ሥራዎች ለማስተዳደር ይግቡ።',
   emailAddress: 'የኢሜይል አድራሻ',
   password: 'የይለፍ ቃል',

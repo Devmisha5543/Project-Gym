@@ -26,6 +26,7 @@ import { authFetch } from './authFetch'
 import { useFeatureVisibility } from './FeatureVisibilityContext'
 import { SIDEBAR_FEATURES } from './featureVisibility'
 import { useTheme } from './ThemeContext'
+import LanguageSelector from './LanguageSelector'
 
 const NOTIFICATION_STORAGE_KEY = 'project-gym-notification-preferences'
 
@@ -250,6 +251,11 @@ function ModernSettingsPage() {
           <span>{t(successMessage)}</span>
         </div>
       )}
+
+      <section className="modern-settings-card">
+        <SectionHeader icon={Globe} title={t('language')} description={t('languageDescription')} />
+        <LanguageSelector />
+      </section>
 
       <section className="modern-settings-card">
         <SectionHeader icon={Sun} title={t('appearance')} description={t('appearanceDescription')} />
