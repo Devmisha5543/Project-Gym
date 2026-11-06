@@ -11,8 +11,7 @@ import datetime
 import hashlib
 import secrets
 from functools import wraps
-from flask import re
-import uuidquest
+import uuid
 import redis
 import json
 import re
