@@ -75,14 +75,18 @@ def cache_response(cache_key):
             except redis.RedisError:
                 cached = None
             if cached:
-                payload = json.loads(cached)
-                if isinstance(payload, list):
-                    for item in payload:
-                        if isinstance(item, dict) and "photo_filename" in item:
-                            item["photo_filename"] = available_member_photo(
-                                item.get("photo_filename")
-                            )
-                return jsonify(payload)
+                try:
+                    payload = json.loads(cached)
+                except (json.JSONDecodeError, TypeError):
+                    app.logger.warning("Response cache contained invalid JSON for %s", key)
+                else:
+                    if isinstance(payload, list):
+                        for item in payload:
+                            if isinstance(item, dict) and "photo_filename" in item:
+                                item["photo_filename"] = available_member_photo(
+                                    item.get("photo_filename")
+                                )
+                    return jsonify(payload)
 
             response = app.make_response(f(*args, **kwargs))
             if response.status_code == 200:

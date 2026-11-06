@@ -146,5 +146,21 @@ class TestCacheInvalidationFailOpen(unittest.TestCase):
                 self.assertEqual(res.get_json(), {"cached": True})
                 mock_get.assert_called_once_with("test:cache:key")
 
+    def test_cache_response_invalid_json_falls_back_to_view(self):
+        """Invalid cached JSON is ignored so the view can refresh the response."""
+        with patch.object(backend.redis_client, "get", return_value="{invalid json"), \
+             patch.object(backend.redis_client, "setex") as mock_setex, \
+             patch.object(backend.app.logger, "warning") as mock_log:
+            @backend.cache_response("test:cache:key")
+            def dummy_view():
+                return backend.jsonify({"cached": False})
+
+            with backend.app.test_request_context():
+                res = dummy_view()
+
+            self.assertEqual(res.get_json(), {"cached": False})
+            mock_setex.assert_called_once()
+            mock_log.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()
