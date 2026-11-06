@@ -11,7 +11,8 @@ import datetime
 import hashlib
 import secrets
 from functools import wraps
-from flask import request
+from flask import re
+import uuidquest
 import redis
 import json
 import re
@@ -142,6 +143,8 @@ def invalidate_personal_training_assignments_cache():
 def invalidate_admins_cache():
     invalidate_caches("admins:all")
 
+app = Flask(__name__)
+
 def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
     if database_url:
@@ -154,7 +157,189 @@ def get_db_connection():
             password=os.getenv("DB_PASSWORD")
         )
 
-app = Flask(__name__)
+def get_control_db_connection():
+    control_database_url = os.getenv("CONTROL_DATABASE_URL")
+    if not control_database_url:
+        raise RuntimeError("CONTROL_DATABASE_URL must be configured")
+    return psycopg2.connect(control_database_url)
+
+def _validate_signup_data(data):
+    required = ("gym_name", "owner_name", "owner_email", "owner_password")
+    missing = [field for field in required if not isinstance(data.get(field), str) or not data[field].strip()]
+    if missing:
+        return f"Missing required fields: {', '.join(missing)}"
+    if len(data["owner_password"]) < 8:
+        return "Owner password must be at least 8 characters."
+    if "@" not in data["owner_email"] or len(data["owner_email"]) > 320:
+        return "Owner email must be valid."
+    if len(data["gym_name"].strip()) > 255 or len(data["owner_name"].strip()) > 255:
+        return "Gym and owner names must be 255 characters or fewer."
+    return None
+
+def _tenant_database_name(tenant_id):
+    return f"gym_{tenant_id.hex}".lower()[:63]
+
+def provision_tenant_database(tenant_id, gym_name, owner_name, owner_email, owner_password):
+    migration_directory = os.getenv("TENANT_MIGRATIONS_DIR")
+    if not migration_directory:
+        raise RuntimeError("TENANT_MIGRATIONS_DIR must be configured before provisioning tenants")
+    if not os.path.isdir(migration_directory):
+        raise RuntimeError("TENANT_MIGRATIONS_DIR does not exist")
+
+    database_name = _tenant_database_name(tenant_id)
+    admin_url = os.getenv("CONTROL_DATABASE_ADMIN_URL") or os.getenv("CONTROL_DATABASE_URL")
+    if not admin_url:
+        raise RuntimeError("CONTROL_DATABASE_ADMIN_URL or CONTROL_DATABASE_URL must be configured")
+
+    conn = psycopg2.connect(admin_url)
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("CREATE DATABASE %s;" % psycopg2.extensions.quote_ident(database_name, cursor))
+    finally:
+        conn.close()
+
+    tenant_url = os.getenv("TENANT_DATABASE_URL_TEMPLATE", "").replace("{database}", database_name)
+    if not tenant_url:
+        raise RuntimeError("TENANT_DATABASE_URL_TEMPLATE must be configured")
+    tenant_conn = None
+    try:
+        tenant_conn = psycopg2.connect(tenant_url)
+        migration_names = sorted(
+            name for name in os.listdir(migration_directory) if name.endswith(".sql")
+        )
+        if not migration_names:
+            raise RuntimeError("TENANT_MIGRATIONS_DIR contains no SQL migrations")
+        with tenant_conn.cursor() as cursor:
+            for migration_name in migration_names:
+                with open(os.path.join(migration_directory, migration_name), "r", encoding="utf-8") as migration_file:
+                    cursor.execute(migration_file.read())
+            password_hash = generate_password_hash(owner_password)
+            cursor.execute(
+                """
+                INSERT INTO gym (name, email)
+                VALUES (%s, %s)
+                RETURNING gym_id;
+                """,
+                (gym_name, owner_email),
+            )
+            gym_id = cursor.fetchone()[0]
+            cursor.execute(
+                """
+                INSERT INTO admin (name, email, password_hash, gym_id, role)
+                VALUES (%s, %s, %s, %s, 'super_admin');
+                """,
+                (owner_name, owner_email, password_hash, gym_id),
+            )
+        tenant_conn.commit()
+    except Exception:
+        if tenant_conn:
+            tenant_conn.rollback()
+        cleanup_conn = psycopg2.connect(admin_url)
+        cleanup_conn.autocommit = True
+        try:
+            with cleanup_conn.cursor() as cursor:
+                cursor.execute(
+                    "DROP DATABASE IF EXISTS %s;" %
+                    psycopg2.extensions.quote_ident(database_name, cursor)
+                )
+        finally:
+            cleanup_conn.close()
+        raise
+    finally:
+        if tenant_conn:
+            tenant_conn.close()
+    return database_name
+
+@app.route("/auth/signup", methods=["POST"])
+def signup():
+    data = request.get_json(silent=True) or {}
+    validation_error = _validate_signup_data(data)
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
+
+    tenant_id = uuid.uuid4()
+    gym_name = data["gym_name"].strip()
+    owner_name = data["owner_name"].strip()
+    owner_email = data["owner_email"].strip().lower()
+    database_name = _tenant_database_name(tenant_id)
+    conn = None
+    cursor = None
+    try:
+        conn = get_control_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO platform_tenants
+                (tenant_id, gym_name, owner_name, owner_email, database_name,
+                 trial_started_at, trial_ends_at)
+            VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP + INTERVAL '21 days')
+            RETURNING tenant_id, trial_ends_at;
+            """,
+            (str(tenant_id), gym_name, owner_name, owner_email, database_name),
+        )
+        tenant_id, trial_ends_at = cursor.fetchone()
+        cursor.execute(
+            """
+            INSERT INTO platform_subscriptions
+                (tenant_id, status, current_period_start, current_period_end)
+            VALUES (%s, 'trial', CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP + INTERVAL '21 days');
+            """,
+            (str(tenant_id),),
+        )
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        if conn:
+            conn.rollback()
+        return jsonify({"error": "An account already exists for that owner email."}), 409
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.error("Signup could not create control-plane tenant")
+        return jsonify({"error": "Signup is temporarily unavailable."}), 503
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+    try:
+        provision_tenant_database(
+            tenant_id, gym_name, owner_name, owner_email, data["owner_password"]
+        )
+    except Exception:
+        app.logger.exception("Tenant database provisioning failed for %s", tenant_id)
+        failed_conn = get_control_db_connection()
+        try:
+            with failed_conn.cursor() as failed_cursor:
+                failed_cursor.execute(
+                    "UPDATE platform_tenants SET status = 'provisioning_failed', updated_at = CURRENT_TIMESTAMP WHERE tenant_id = %s;",
+                    (str(tenant_id),),
+                )
+            failed_conn.commit()
+        finally:
+            failed_conn.close()
+        return jsonify({"error": "Gym setup could not be completed."}), 503
+
+    conn = get_control_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE platform_tenants SET status = 'trial', updated_at = CURRENT_TIMESTAMP WHERE tenant_id = %s;",
+                (str(tenant_id),),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    return jsonify({
+        "message": "Gym signup completed.",
+        "tenant_id": str(tenant_id),
+        "status": "trial",
+        "trial_ends_at": trial_ends_at.isoformat(),
+    }), 201
+
 _password_reset_executor = ThreadPoolExecutor(max_workers=2)
 _PASSWORD_RESET_RATE_LIMIT = 3
 _PASSWORD_RESET_RATE_WINDOW = 60 * 60
@@ -1104,7 +1289,7 @@ def update_member(member_id):
                     str(data["wants_trainer"]).lower() == "true",
                     member_id
                 )
-            )mm
+            )
 
         if cursor.rowcount == 0:
             conn.rollback()
