@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { trainerSchema } from './schemas'
 import { API_URL } from './config'
@@ -12,9 +12,21 @@ function TrainerForm({ onTrainerCreated }) {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [certification, setCertification] = useState('')
+  const [branches, setBranches] = useState([])
+  const [branchId, setBranchId] = useState('')
   const [errors, setErrors] = useState({})
   const [feedback, setFeedback] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    authFetch(`${API_URL}/branches`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to load branches')
+        return response.json()
+      })
+      .then(data => setBranches(Array.isArray(data) ? data : []))
+      .catch(() => setFeedback({ type: 'error', message: 'Unable to load branches.' }))
+  }, [])
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -32,7 +44,7 @@ function TrainerForm({ onTrainerCreated }) {
     setFeedback(null)
     setSubmitting(true)
 
-    const newTrainer = { name, phone, email, certification }
+    const newTrainer = { name, phone, email, certification, branch_id: branchId }
 
     authFetch(`${API_URL}/trainers`, {
       method: "POST",
@@ -70,6 +82,17 @@ function TrainerForm({ onTrainerCreated }) {
 
       <form className="trainer-form" onSubmit={handleSubmit}>
         <div className="trainer-form-grid">
+          <label className="trainer-field">
+            <span>{t('branch', { ns: 'common' })}</span>
+            <div className="trainer-input-wrap">
+              <select value={branchId} onChange={e => setBranchId(e.target.value)} required>
+                <option value="">{t('selectBranch', { ns: 'common' })}</option>
+                {branches.map(branch => (
+                  <option key={branch.branch_id} value={branch.branch_id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+          </label>
           <label className="trainer-field">
             <span>{t('name', { ns: 'common' })}</span>
             <div className="trainer-input-wrap">

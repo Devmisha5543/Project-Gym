@@ -114,7 +114,8 @@ def invalidate_branches_cache():
     )
     invalidate_caches(
         f"branches:{gym_id}" if gym_id is not None else "branches:all",
-        "branches:all", "classes:all", "equipment:all", "trainer_branches:all"
+        "branches:all", "classes:all", "equipment:all", "trainer_branches:all",
+        "trainers:all", "personal_training_assignments:all"
     )
 
 def invalidate_trainers_cache():
@@ -148,7 +149,7 @@ def invalidate_equipment_cache():
     invalidate_caches("equipment:all")
 
 def invalidate_trainer_branches_cache():
-    invalidate_caches("trainer_branches:all")
+    invalidate_caches("trainer_branches:all", "trainers:all", "personal_training_assignments:all")
 
 def invalidate_personal_training_assignments_cache():
     invalidate_caches("personal_training_assignments:all")
@@ -1070,7 +1071,7 @@ def create_member():
         join_date = datetime.date.fromisoformat(data["join_date"])
         membership_end_date = join_date + datetime.timedelta(days=plan[0])
         cursor.execute(
-            "SELECT 1 FROM branch WHERE branch_id = %s AND gym_id = %s;",
+            "SELECT 1 FROM branch WHERE branch_id = %s AND gym_id = %s FOR SHARE;",
             (data["branch_id"], request.decoded_token.get("gym_id"))
         )
         if cursor.fetchone() is None:
@@ -1278,7 +1279,10 @@ def update_member(member_id):
                     wants_trainer = %s,
                     photo_filename = %s
                 WHERE member_id = %s
-                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
+                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s)
+                  AND EXISTS (SELECT 1 FROM Branch destination_branch
+                              WHERE destination_branch.branch_id = %s
+                                AND destination_branch.gym_id = %s);
                 """,
                 (
                     data["branch_id"],
@@ -1290,6 +1294,8 @@ def update_member(member_id):
                     str(data["wants_trainer"]).lower() == "true",
                     photo_filename,
                     member_id,
+                    request.decoded_token.get("gym_id"),
+                    data["branch_id"],
                     request.decoded_token.get("gym_id")
                 )
             )
@@ -1305,7 +1311,10 @@ def update_member(member_id):
                     join_date = %s,
                     wants_trainer = %s
                 WHERE member_id = %s
-                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);
+                  AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s)
+                  AND EXISTS (SELECT 1 FROM Branch destination_branch
+                              WHERE destination_branch.branch_id = %s
+                                AND destination_branch.gym_id = %s);
                 """,
                 (
                     data["branch_id"],
@@ -1316,6 +1325,8 @@ def update_member(member_id):
                     data["join_date"],
                     str(data["wants_trainer"]).lower() == "true",
                     member_id,
+                    request.decoded_token.get("gym_id"),
+                    data["branch_id"],
                     request.decoded_token.get("gym_id")
                 )
             )
@@ -1394,10 +1405,13 @@ def get_trainers():
     cursor = conn.cursor()
     try:
         cursor.execute("""
-        SELECT trainer_id, name, phone, email, certification
-        FROM trainer
-        ORDER BY trainer_id ASC;
-        """)
+        SELECT DISTINCT t.trainer_id, t.name, t.phone, t.email, t.certification
+        FROM trainer t
+        JOIN trainerbranch tb ON tb.trainer_id = t.trainer_id
+        JOIN branch b ON b.branch_id = tb.branch_id
+        WHERE b.gym_id = %s
+        ORDER BY t.trainer_id ASC;
+        """, (request.decoded_token.get("gym_id"),))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -1425,7 +1439,7 @@ def create_trainer():
     if not data:
         return jsonify({"error": REQUEST_BODY_JSON_ERROR}), 400
 
-    required_fields = ["name", "phone", "email", "certification"]
+    required_fields = ["name", "phone", "email", "certification", "branch_id"]
     missing = [field for field in required_fields if field not in data]
     if missing:
         return jsonify({"error": f"Missing required fields: {', '.join(missing)}"}), 400
@@ -1434,10 +1448,22 @@ def create_trainer():
     cursor = conn.cursor()
     try:
         cursor.execute(
+            "SELECT branch_id FROM Branch WHERE branch_id = %s AND gym_id = %s FOR SHARE;",
+            (data["branch_id"], request.decoded_token.get("gym_id"))
+        )
+        branch = cursor.fetchone()
+        if branch is None:
+            conn.rollback()
+            return jsonify({"error": "Branch not found"}), 404
+        cursor.execute(
             "INSERT INTO Trainer (name, phone, email, certification) VALUES(%s, %s, %s, %s) RETURNING trainer_id;",
             (data["name"], data["phone"], data["email"], data["certification"])
         )
         new_id = cursor.fetchone()[0]
+        cursor.execute(
+            "INSERT INTO TrainerBranch (trainer_id, branch_id) VALUES (%s, %s);",
+            (new_id, branch[0])
+        )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1455,7 +1481,12 @@ def delete_trainer(trainer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Trainer WHERE trainer_id = %s;", (trainer_id,))
+        cursor.execute(
+            "DELETE FROM Trainer t WHERE t.trainer_id = %s AND EXISTS ("
+            "SELECT 1 FROM TrainerBranch tb JOIN Branch b ON b.branch_id = tb.branch_id "
+            "WHERE tb.trainer_id = t.trainer_id AND b.gym_id = %s);",
+            (trainer_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Trainer {trainer_id} not found"}), 404
@@ -1485,8 +1516,12 @@ def update_trainer(trainer_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Trainer SET name = %s, phone = %s, email = %s, certification = %s WHERE trainer_id = %s",
-            (data["name"], data["phone"], data["email"], data["certification"], trainer_id)
+            "UPDATE Trainer t SET name = %s, phone = %s, email = %s, certification = %s "
+            "WHERE t.trainer_id = %s AND EXISTS ("
+            "SELECT 1 FROM TrainerBranch tb JOIN Branch b ON b.branch_id = tb.branch_id "
+            "WHERE tb.trainer_id = t.trainer_id AND b.gym_id = %s);",
+            (data["name"], data["phone"], data["email"], data["certification"],
+             trainer_id, request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -1598,7 +1633,7 @@ def create_membership():
         end_date = start_date + datetime.timedelta(days=plan[0])
         cursor.execute(
             "SELECT 1 FROM member m JOIN branch b ON b.branch_id = m.branch_id "
-            "WHERE m.member_id = %s AND b.gym_id = %s;",
+            "WHERE m.member_id = %s AND b.gym_id = %s FOR SHARE OF m, b;",
             (data["member_id"], request.decoded_token.get("gym_id"))
         )
         if cursor.fetchone() is None:
@@ -1616,7 +1651,11 @@ def create_membership():
         )
         current_membership = cursor.fetchone()
         if current_membership and current_membership[0] == new_id:
-            cursor.execute("UPDATE Member SET join_date = %s WHERE member_id = %s;", (start_date, data["member_id"]))
+            cursor.execute(
+                "UPDATE Member SET join_date = %s WHERE member_id = %s "
+                "AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);",
+                (start_date, data["member_id"], request.decoded_token.get("gym_id"))
+            )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1678,9 +1717,13 @@ def update_membership(membership_id):
         cursor.execute(
             "UPDATE Membership SET member_id = %s, plan_id = %s, start_date = %s, end_date = %s, status = %s "
             "WHERE membership_id = %s AND member_id IN "
-            "(SELECT m.member_id FROM member m JOIN branch b ON b.branch_id = m.branch_id WHERE b.gym_id = %s);",
+            "(SELECT m.member_id FROM member m JOIN branch b ON b.branch_id = m.branch_id WHERE b.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Member destination_member JOIN Branch destination_branch "
+            "ON destination_branch.branch_id = destination_member.branch_id "
+            "WHERE destination_member.member_id = %s AND destination_branch.gym_id = %s);",
             (data["member_id"], data["plan_id"], start_date, end_date,
-             data["status"], membership_id, request.decoded_token.get("gym_id"))
+             data["status"], membership_id, request.decoded_token.get("gym_id"),
+             data["member_id"], request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -1692,7 +1735,11 @@ def update_membership(membership_id):
         )
         current_membership = cursor.fetchone()
         if current_membership and current_membership[0] == membership_id:
-            cursor.execute("UPDATE Member SET join_date = %s WHERE member_id = %s;", (start_date, data["member_id"]))
+            cursor.execute(
+                "UPDATE Member SET join_date = %s WHERE member_id = %s "
+                "AND branch_id IN (SELECT branch_id FROM Branch WHERE gym_id = %s);",
+                (start_date, data["member_id"], request.decoded_token.get("gym_id"))
+            )
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1711,7 +1758,20 @@ def get_personal_trainer_assignments():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT assignment_id, trainer_id, member_id, speciality, start_date, status FROM personaltrainingassignment;")
+        cursor.execute("""
+            SELECT a.assignment_id, a.trainer_id, a.member_id, a.speciality, a.start_date, a.status
+            FROM PersonalTrainingAssignment a
+            JOIN Member m ON m.member_id = a.member_id
+            JOIN Branch member_branch ON member_branch.branch_id = m.branch_id
+            WHERE member_branch.gym_id = %s
+              AND EXISTS (
+                  SELECT 1
+                  FROM TrainerBranch tb
+                  JOIN Branch trainer_branch ON trainer_branch.branch_id = tb.branch_id
+                  WHERE tb.trainer_id = a.trainer_id
+                    AND trainer_branch.gym_id = %s
+              );
+        """, (request.decoded_token.get("gym_id"), request.decoded_token.get("gym_id")))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -1747,10 +1807,23 @@ def create_personal_trainer_assignment():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO PersonalTrainingAssignment (trainer_id, member_id, speciality, start_date, status) VALUES(%s, %s, %s, %s, %s) RETURNING assignment_id;",
-            (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"])
+            "INSERT INTO PersonalTrainingAssignment (trainer_id, member_id, speciality, start_date, status) "
+            "SELECT %s, m.member_id, %s, %s, %s FROM Member m "
+            "JOIN Branch member_branch ON member_branch.branch_id = m.branch_id "
+            "WHERE m.member_id = %s AND member_branch.gym_id = %s "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch tb JOIN Branch trainer_branch "
+            "ON trainer_branch.branch_id = tb.branch_id "
+            "WHERE tb.trainer_id = %s AND trainer_branch.gym_id = %s) "
+            "RETURNING assignment_id;",
+            (data["trainer_id"], data["speciality"], data["start_date"], data["status"],
+             data["member_id"], request.decoded_token.get("gym_id"), data["trainer_id"],
+             request.decoded_token.get("gym_id"))
         )
-        new_id = cursor.fetchone()[0]
+        created = cursor.fetchone()
+        if created is None:
+            conn.rollback()
+            return jsonify({"error": "Member or trainer not found"}), 404
+        new_id = created[0]
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1768,7 +1841,14 @@ def delete_personal_trainer_assignment(assignment_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM PersonalTrainingAssignment WHERE assignment_id = %s;", (assignment_id,))
+        cursor.execute(
+            "DELETE FROM PersonalTrainingAssignment a WHERE a.assignment_id = %s "
+            "AND EXISTS (SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = a.member_id AND b.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch tb JOIN Branch b ON b.branch_id = tb.branch_id "
+            "WHERE tb.trainer_id = a.trainer_id AND b.gym_id = %s);",
+            (assignment_id, request.decoded_token.get("gym_id"), request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"PersonalTrainingAssignment {assignment_id} not found"}), 404
@@ -1795,8 +1875,26 @@ def update_personal_trainer_assignment(assignment_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE PersonalTrainingAssignment SET trainer_id = %s, member_id = %s, speciality = %s, start_date = %s, status = %s WHERE assignment_id = %s;",
-            (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"], data["status"], assignment_id)
+            "UPDATE PersonalTrainingAssignment a SET trainer_id = %s, member_id = %s, "
+            "speciality = %s, start_date = %s, status = %s "
+            "WHERE a.assignment_id = %s "
+            "AND EXISTS (SELECT 1 FROM Member old_member JOIN Branch old_branch "
+            "ON old_branch.branch_id = old_member.branch_id "
+            "WHERE old_member.member_id = a.member_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch old_tb JOIN Branch old_branch "
+            "ON old_branch.branch_id = old_tb.branch_id "
+            "WHERE old_tb.trainer_id = a.trainer_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Member new_member JOIN Branch new_branch "
+            "ON new_branch.branch_id = new_member.branch_id "
+            "WHERE new_member.member_id = %s AND new_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch new_tb JOIN Branch new_branch "
+            "ON new_branch.branch_id = new_tb.branch_id "
+            "WHERE new_tb.trainer_id = %s AND new_branch.gym_id = %s);",
+            (data["trainer_id"], data["member_id"], data["speciality"], data["start_date"],
+             data["status"], assignment_id, request.decoded_token.get("gym_id"),
+             request.decoded_token.get("gym_id"), data["member_id"],
+             request.decoded_token.get("gym_id"), data["trainer_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -1819,7 +1917,15 @@ def get_class_bookings():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT booking_id, member_id, class_id, booking_date, cancel_date, status FROM classbooking;")
+        cursor.execute("""
+            SELECT cb.booking_id, cb.member_id, cb.class_id, cb.booking_date, cb.cancel_date, cb.status
+            FROM ClassBooking cb
+            JOIN Member m ON m.member_id = cb.member_id
+            JOIN Branch member_branch ON member_branch.branch_id = m.branch_id
+            JOIN Class c ON c.class_id = cb.class_id
+            JOIN Branch class_branch ON class_branch.branch_id = c.branch_id
+            WHERE member_branch.gym_id = %s AND class_branch.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"), request.decoded_token.get("gym_id")))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -1855,10 +1961,22 @@ def create_class_booking():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO ClassBooking (member_id, class_id, booking_date, cancel_date, status) VALUES(%s,%s, %s, %s, %s) RETURNING booking_id;",
-            (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"])
+            "INSERT INTO ClassBooking (member_id, class_id, booking_date, cancel_date, status) "
+            "SELECT m.member_id, c.class_id, %s, %s, %s FROM Member m CROSS JOIN Class c "
+            "WHERE m.member_id = %s AND EXISTS (SELECT 1 FROM Branch mb "
+            "WHERE mb.branch_id = m.branch_id AND mb.gym_id = %s) "
+            "AND c.class_id = %s AND EXISTS (SELECT 1 FROM Branch cb "
+            "WHERE cb.branch_id = c.branch_id AND cb.gym_id = %s) "
+            "RETURNING booking_id;",
+            (data["booking_date"], data.get("cancel_date"), data["status"],
+             data["member_id"], request.decoded_token.get("gym_id"), data["class_id"],
+             request.decoded_token.get("gym_id"))
         )
-        new_id = cursor.fetchone()[0]
+        created = cursor.fetchone()
+        if created is None:
+            conn.rollback()
+            return jsonify({"error": "Member or class not found"}), 404
+        new_id = created[0]
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1876,7 +1994,14 @@ def delete_class_booking(booking_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM ClassBooking WHERE booking_id = %s;", (booking_id,))
+        cursor.execute(
+            "DELETE FROM ClassBooking cb WHERE cb.booking_id = %s "
+            "AND EXISTS (SELECT 1 FROM Member m JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE m.member_id = cb.member_id AND b.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Class c JOIN Branch b ON b.branch_id = c.branch_id "
+            "WHERE c.class_id = cb.class_id AND b.gym_id = %s);",
+            (booking_id, request.decoded_token.get("gym_id"), request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"ClassBooking {booking_id} not found"}), 404
@@ -1903,8 +2028,25 @@ def update_class_booking(booking_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE ClassBooking SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s WHERE booking_id = %s;",
-            (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"), data["status"], booking_id)
+            "UPDATE ClassBooking cb SET member_id = %s, class_id = %s, booking_date = %s, cancel_date = %s, status = %s "
+            "WHERE cb.booking_id = %s "
+            "AND EXISTS (SELECT 1 FROM Member old_member JOIN Branch old_branch "
+            "ON old_branch.branch_id = old_member.branch_id "
+            "WHERE old_member.member_id = cb.member_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Class old_class JOIN Branch old_branch "
+            "ON old_branch.branch_id = old_class.branch_id "
+            "WHERE old_class.class_id = cb.class_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Member new_member JOIN Branch new_branch "
+            "ON new_branch.branch_id = new_member.branch_id "
+            "WHERE new_member.member_id = %s AND new_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Class new_class JOIN Branch new_branch "
+            "ON new_branch.branch_id = new_class.branch_id "
+            "WHERE new_class.class_id = %s AND new_branch.gym_id = %s);",
+            (data["member_id"], data["class_id"], data["booking_date"], data.get("cancel_date"),
+             data["status"], booking_id, request.decoded_token.get("gym_id"),
+             request.decoded_token.get("gym_id"), data["member_id"],
+             request.decoded_token.get("gym_id"), data["class_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -1927,7 +2069,12 @@ def get_classes():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT class_id, trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity FROM class;")
+        cursor.execute("""
+            SELECT c.class_id, c.trainer_id, c.branch_id, c.class_name, c.schedule_time, c.duration_minutes, c.capacity
+            FROM Class c
+            JOIN Branch b ON b.branch_id = c.branch_id
+            WHERE b.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"),))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -1964,10 +2111,22 @@ def create_class():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO Class (trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity) VALUES(%s, %s, %s, %s, %s, %s) RETURNING class_id;",
-            (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"])
+            "INSERT INTO Class (trainer_id, branch_id, class_name, schedule_time, duration_minutes, capacity) "
+            "SELECT %s, b.branch_id, %s, %s, %s, %s FROM Branch b "
+            "WHERE b.branch_id = %s AND b.gym_id = %s "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch tb JOIN Branch trainer_branch "
+            "ON trainer_branch.branch_id = tb.branch_id WHERE tb.trainer_id = %s "
+            "AND trainer_branch.gym_id = %s) RETURNING class_id;",
+            (data["trainer_id"], data["class_name"], data["schedule_time"],
+             data["duration_minutes"], data["capacity"], data["branch_id"],
+             request.decoded_token.get("gym_id"), data["trainer_id"],
+             request.decoded_token.get("gym_id"))
         )
-        new_id = cursor.fetchone()[0]
+        created = cursor.fetchone()
+        if created is None:
+            conn.rollback()
+            return jsonify({"error": "Branch or trainer not found"}), 404
+        new_id = created[0]
         conn.commit()
     except Exception:
         conn.rollback()
@@ -1985,7 +2144,11 @@ def delete_class(class_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Class WHERE class_id = %s;", (class_id,))
+        cursor.execute(
+            "DELETE FROM Class c WHERE c.class_id = %s AND EXISTS ("
+            "SELECT 1 FROM Branch b WHERE b.branch_id = c.branch_id AND b.gym_id = %s);",
+            (class_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Class {class_id} not found"}), 404
@@ -2015,8 +2178,17 @@ def update_class(class_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Class SET trainer_id = %s, branch_id = %s, class_name = %s, schedule_time = %s, duration_minutes = %s, capacity = %s WHERE class_id = %s;",
-            (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"], data["duration_minutes"], data["capacity"], class_id)
+            "UPDATE Class c SET trainer_id = %s, branch_id = %s, class_name = %s, schedule_time = %s, duration_minutes = %s, capacity = %s "
+            "WHERE c.class_id = %s "
+            "AND EXISTS (SELECT 1 FROM Branch old_branch WHERE old_branch.branch_id = c.branch_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Branch new_branch WHERE new_branch.branch_id = %s AND new_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM TrainerBranch tb JOIN Branch trainer_branch "
+            "ON trainer_branch.branch_id = tb.branch_id WHERE tb.trainer_id = %s AND trainer_branch.gym_id = %s);",
+            (data["trainer_id"], data["branch_id"], data["class_name"], data["schedule_time"],
+             data["duration_minutes"], data["capacity"], class_id,
+             request.decoded_token.get("gym_id"), data["branch_id"],
+             request.decoded_token.get("gym_id"), data["trainer_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -2039,7 +2211,14 @@ def get_payments():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT payment_id, membership_id, amount, payment_date, payment_method FROM payment;")
+        cursor.execute("""
+            SELECT p.payment_id, p.membership_id, p.amount, p.payment_date, p.payment_method
+            FROM Payment p
+            JOIN Membership ms ON ms.membership_id = p.membership_id
+            JOIN Member m ON m.member_id = ms.member_id
+            JOIN Branch b ON b.branch_id = m.branch_id
+            WHERE b.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"),))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -2075,18 +2254,31 @@ def create_payment():
     try:
         if data.get("renewal"):
             cursor.execute(
-                "SELECT membership_id FROM Membership WHERE membership_id = %s AND status IN ('active', 'expired') FOR UPDATE;",
-                (data["membership_id"],)
+                "SELECT ms.membership_id FROM Membership ms "
+                "JOIN Member m ON m.member_id = ms.member_id "
+                "JOIN Branch b ON b.branch_id = m.branch_id "
+                "WHERE ms.membership_id = %s AND ms.status IN ('active', 'expired') "
+                "AND b.gym_id = %s FOR UPDATE OF ms;",
+                (data["membership_id"], request.decoded_token.get("gym_id"))
             )
             if not cursor.fetchone():
                 conn.rollback()
                 return jsonify({"error": "Membership cannot be renewed"}), 404
 
         cursor.execute(
-            "INSERT INTO Payment (membership_id, amount, payment_date, payment_method) VALUES(%s, %s, %s, %s) RETURNING payment_id;",
-            (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"])
+            "INSERT INTO Payment (membership_id, amount, payment_date, payment_method) "
+            "SELECT ms.membership_id, %s, %s, %s FROM Membership ms "
+            "JOIN Member m ON m.member_id = ms.member_id "
+            "JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE ms.membership_id = %s AND b.gym_id = %s RETURNING payment_id;",
+            (data["amount"], data["payment_date"], data["payment_method"],
+             data["membership_id"], request.decoded_token.get("gym_id"))
         )
-        new_id = cursor.fetchone()[0]
+        created = cursor.fetchone()
+        if created is None:
+            conn.rollback()
+            return jsonify({"error": "Membership not found"}), 404
+        new_id = created[0]
         if data.get("renewal"):
             cursor.execute(
                 "UPDATE Membership ms SET end_date = GREATEST(ms.end_date, CURRENT_DATE) + mp.duration_days, status = 'active' "
@@ -2114,7 +2306,13 @@ def delete_payment(payment_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Payment WHERE payment_id = %s;", (payment_id,))
+        cursor.execute(
+            "DELETE FROM Payment p WHERE p.payment_id = %s AND EXISTS ("
+            "SELECT 1 FROM Membership ms JOIN Member m ON m.member_id = ms.member_id "
+            "JOIN Branch b ON b.branch_id = m.branch_id "
+            "WHERE ms.membership_id = p.membership_id AND b.gym_id = %s);",
+            (payment_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Payment {payment_id} not found"}), 404
@@ -2141,8 +2339,17 @@ def update_payment(payment_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Payment SET membership_id = %s, amount = %s, payment_date = %s, payment_method = %s WHERE payment_id = %s;",
-            (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"], payment_id)
+            "UPDATE Payment p SET membership_id = %s, amount = %s, payment_date = %s, payment_method = %s "
+            "WHERE p.payment_id = %s "
+            "AND EXISTS (SELECT 1 FROM Membership old_ms JOIN Member old_m ON old_m.member_id = old_ms.member_id "
+            "JOIN Branch old_b ON old_b.branch_id = old_m.branch_id "
+            "WHERE old_ms.membership_id = p.membership_id AND old_b.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Membership new_ms JOIN Member new_m ON new_m.member_id = new_ms.member_id "
+            "JOIN Branch new_b ON new_b.branch_id = new_m.branch_id "
+            "WHERE new_ms.membership_id = %s AND new_b.gym_id = %s);",
+            (data["membership_id"], data["amount"], data["payment_date"], data["payment_method"],
+             payment_id, request.decoded_token.get("gym_id"), data["membership_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -2165,7 +2372,12 @@ def get_equipment():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT equipment_id, branch_id, name, quantity, condition FROM equipment;")
+        cursor.execute("""
+            SELECT e.equipment_id, e.branch_id, e.name, e.quantity, e.condition
+            FROM Equipment e
+            JOIN Branch b ON b.branch_id = e.branch_id
+            WHERE b.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"),))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -2200,10 +2412,17 @@ def create_equipment():
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO Equipment (branch_id, name, quantity, condition) VALUES(%s, %s, %s, %s) RETURNING equipment_id;",
-            (data["branch_id"], data["name"], data["quantity"], data["condition"])
+            "INSERT INTO Equipment (branch_id, name, quantity, condition) "
+            "SELECT b.branch_id, %s, %s, %s FROM Branch b "
+            "WHERE b.branch_id = %s AND b.gym_id = %s RETURNING equipment_id;",
+            (data["name"], data["quantity"], data["condition"], data["branch_id"],
+             request.decoded_token.get("gym_id"))
         )
-        new_id = cursor.fetchone()[0]
+        created = cursor.fetchone()
+        if created is None:
+            conn.rollback()
+            return jsonify({"error": "Branch not found"}), 404
+        new_id = created[0]
         conn.commit()
     except Exception:
         conn.rollback()
@@ -2221,7 +2440,11 @@ def delete_equipment(equipment_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM Equipment WHERE equipment_id = %s;", (equipment_id,))
+        cursor.execute(
+            "DELETE FROM Equipment e WHERE e.equipment_id = %s AND EXISTS ("
+            "SELECT 1 FROM Branch b WHERE b.branch_id = e.branch_id AND b.gym_id = %s);",
+            (equipment_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"Equipment {equipment_id} not found"}), 404
@@ -2248,8 +2471,13 @@ def update_equipment(equipment_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "UPDATE Equipment SET branch_id = %s, name = %s, quantity = %s, condition = %s WHERE equipment_id = %s;",
-            (data["branch_id"], data["name"], data["quantity"], data["condition"], equipment_id)
+            "UPDATE Equipment e SET branch_id = %s, name = %s, quantity = %s, condition = %s "
+            "WHERE e.equipment_id = %s "
+            "AND EXISTS (SELECT 1 FROM Branch old_branch WHERE old_branch.branch_id = e.branch_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Branch new_branch WHERE new_branch.branch_id = %s AND new_branch.gym_id = %s);",
+            (data["branch_id"], data["name"], data["quantity"], data["condition"],
+             equipment_id, request.decoded_token.get("gym_id"), data["branch_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -2272,7 +2500,13 @@ def get_trainer_branch():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT trainer_id,branch_id FROM trainerbranch;")
+        cursor.execute("""
+            SELECT tb.trainer_id, tb.branch_id
+            FROM TrainerBranch tb
+            JOIN Branch b ON b.branch_id = tb.branch_id
+            JOIN Trainer t ON t.trainer_id = tb.trainer_id
+            WHERE b.gym_id = %s;
+        """, (request.decoded_token.get("gym_id"),))
         rows = cursor.fetchall()
     finally:
         cursor.close()
@@ -2303,10 +2537,24 @@ def create_trainer_branch():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        cursor.execute("SELECT trainer_id FROM Trainer WHERE trainer_id = %s FOR UPDATE;", (data["trainer_id"],))
+        if cursor.fetchone() is None:
+            conn.rollback()
+            return jsonify({"error": "Select an existing trainer and branch."}), 404
         cursor.execute(
-            "INSERT INTO TrainerBranch (trainer_id,branch_id) VALUES(%s, %s);",
-            (data["trainer_id"], data["branch_id"])
+            "INSERT INTO TrainerBranch (trainer_id, branch_id) "
+            "SELECT t.trainer_id, b.branch_id FROM Trainer t CROSS JOIN Branch b "
+            "WHERE t.trainer_id = %s AND b.branch_id = %s AND b.gym_id = %s "
+            "AND (EXISTS (SELECT 1 FROM TrainerBranch own_tb JOIN Branch own_branch "
+            "ON own_branch.branch_id = own_tb.branch_id WHERE own_tb.trainer_id = t.trainer_id "
+            "AND own_branch.gym_id = %s) OR NOT EXISTS "
+            "(SELECT 1 FROM TrainerBranch any_tb WHERE any_tb.trainer_id = t.trainer_id));",
+            (data["trainer_id"], data["branch_id"], request.decoded_token.get("gym_id"),
+             request.decoded_token.get("gym_id"))
         )
+        if cursor.rowcount == 0:
+            conn.rollback()
+            return jsonify({"error": "Trainer or branch not found"}), 404
         conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
@@ -2334,9 +2582,24 @@ def update_trainer_branch(trainer_id, branch_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        cursor.execute("SELECT trainer_id FROM Trainer WHERE trainer_id = %s FOR UPDATE;", (data["trainer_id"],))
+        if cursor.fetchone() is None:
+            conn.rollback()
+            return jsonify({"error": "Select an existing trainer and branch."}), 404
         cursor.execute(
-            "UPDATE TrainerBranch SET trainer_id = %s, branch_id = %s WHERE trainer_id = %s AND branch_id = %s;",
-            (data["trainer_id"], data["branch_id"], trainer_id, branch_id)
+            "UPDATE TrainerBranch tb SET trainer_id = %s, branch_id = %s "
+            "WHERE tb.trainer_id = %s AND tb.branch_id = %s "
+            "AND EXISTS (SELECT 1 FROM Branch old_branch WHERE old_branch.branch_id = tb.branch_id AND old_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Branch new_branch WHERE new_branch.branch_id = %s AND new_branch.gym_id = %s) "
+            "AND EXISTS (SELECT 1 FROM Trainer t WHERE t.trainer_id = %s "
+            "AND (EXISTS (SELECT 1 FROM TrainerBranch own_tb JOIN Branch own_branch "
+            "ON own_branch.branch_id = own_tb.branch_id WHERE own_tb.trainer_id = t.trainer_id "
+            "AND own_branch.gym_id = %s) OR NOT EXISTS "
+            "(SELECT 1 FROM TrainerBranch any_tb WHERE any_tb.trainer_id = t.trainer_id)));",
+            (data["trainer_id"], data["branch_id"], trainer_id, branch_id,
+             request.decoded_token.get("gym_id"), data["branch_id"],
+             request.decoded_token.get("gym_id"), data["trainer_id"],
+             request.decoded_token.get("gym_id"))
         )
         if cursor.rowcount == 0:
             conn.rollback()
@@ -2364,7 +2627,11 @@ def delete_trainer_branch(trainer_id, branch_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("DELETE FROM TrainerBranch WHERE trainer_id = %s AND branch_id = %s;", (trainer_id, branch_id))
+        cursor.execute(
+            "DELETE FROM TrainerBranch tb WHERE tb.trainer_id = %s AND tb.branch_id = %s "
+            "AND EXISTS (SELECT 1 FROM Branch b WHERE b.branch_id = tb.branch_id AND b.gym_id = %s);",
+            (trainer_id, branch_id, request.decoded_token.get("gym_id"))
+        )
         if cursor.rowcount == 0:
             conn.rollback()
             return jsonify({"error": f"TrainerBranch trainer_id {trainer_id} branch_id {branch_id} not found"}), 404
