@@ -93,7 +93,8 @@ class MutationCursor:
     def __init__(self):
         self.next_id = 100
 
-    def execute(self, sql, params=None):
+    def execute(self, sql, _params=None):
+        del _params
         if "RETURNING member_id" in sql:
             self.next_id = 101
         elif "RETURNING membership_id" in sql:
@@ -140,7 +141,7 @@ class AnalyticsTests(unittest.TestCase):
         self.patches = [
             patch.object(backend.jwt, "decode", return_value={"gym_id": 77}),
             patch.object(backend.redis_client, "get", side_effect=lambda key: self.cache.get(key)),
-            patch.object(backend.redis_client, "setex", side_effect=lambda key, ttl, value: self.cache.__setitem__(key, value)),
+            patch.object(backend.redis_client, "setex", side_effect=lambda key, *args: self.cache.__setitem__(key, args[-1])),
             patch.object(backend, "_analytics_connection", side_effect=lambda: (connection_factory(), 77)),
         ]
         for mocked in self.patches:

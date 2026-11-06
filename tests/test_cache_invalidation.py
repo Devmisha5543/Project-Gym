@@ -120,7 +120,7 @@ class TestCacheInvalidationFailOpen(unittest.TestCase):
             with patch("redis.from_url") as mock_from_url:
                 url = os.getenv("REDIS_URL")
                 if url:
-                    client = redis.from_url(url, decode_responses=True)
+                    redis.from_url(url, decode_responses=True)
                 mock_from_url.assert_called_once_with(test_url, decode_responses=True)
 
     def test_redis_init_fallback_when_env_url_absent(self):
@@ -129,9 +129,9 @@ class TestCacheInvalidationFailOpen(unittest.TestCase):
             with patch("redis.Redis") as mock_redis_cls:
                 url = os.getenv("REDIS_URL")
                 if url:
-                    client = redis.from_url(url, decode_responses=True)
+                    redis.from_url(url, decode_responses=True)
                 else:
-                    client = redis.Redis(host="localhost", port=6379, decode_responses=True)
+                    redis.Redis(host="localhost", port=6379, decode_responses=True)
                 mock_redis_cls.assert_called_once_with(host="localhost", port=6379, decode_responses=True)
 
     def test_cache_response_decorator_caching(self):
@@ -148,4 +148,3 @@ class TestCacheInvalidationFailOpen(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -679,7 +679,7 @@ def get_gym():
             "logo_url": row[6],
             "created_at": row[7].isoformat() if row[7] else None
         }), 200
-    except Exception as e:
+    except Exception:
         return jsonify({"error": "Failed to retrieve gym details"}), 500
     finally:
         if cursor:
@@ -750,7 +750,7 @@ def update_gym():
             "gym": gym_data,
             **gym_data
         }), 200
-    except Exception as e:
+    except Exception:
         if conn:
             conn.rollback()
         return jsonify({"error": "Failed to update gym details"}), 500
